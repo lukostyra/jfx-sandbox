@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, 2018, Oracle and/or its affiliates. All rights reserved.
+ * Copyright (c) 2011, 2021, Oracle and/or its affiliates. All rights reserved.
  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
  *
  * This code is free software; you can redistribute it and/or modify it
@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <gdk/gdk.h>
-//#include <gdk/gdkx.h>
+#include <gdk/x11/gdkx.h>
 
 #include <com_sun_glass_ui_GlassRobot.h>
 #include <com_sun_glass_ui_gtk_GtkRobot.h>
@@ -40,6 +40,72 @@
 
 #define MOUSE_BACK_BTN 8
 #define MOUSE_FORWARD_BTN 9
+
+static void getXPointerPos(int *x, int *y) {
+    Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+
+    Window child_win, root_win;
+    int win_x, win_y;
+    guint mask = 0;
+
+    XQueryPointer(xdisplay, XRootWindow(xdisplay, DefaultScreen(xdisplay)),
+                  &child_win, &root_win, x, y, &win_x, &win_y, &mask);
+}
+
+static void checkXTest(JNIEnv* env) {
+    int32_t major_opcode, first_event, first_error;
+    int32_t  event_basep, error_basep, majorp, minorp;
+    static int32_t isXTestAvailable;
+    static gboolean checkDone = FALSE;
+    if (!checkDone) {
+        Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+
+        /* check if XTest is available */
+        isXTestAvailable = XQueryExtension(xdisplay, XTestExtensionName, &major_opcode, &first_event, &first_error);
+        if (isXTestAvailable) {
+            /* check if XTest version is OK */
+            XTestQueryExtension(xdisplay, &event_basep, &error_basep, &majorp, &minorp);
+            if (majorp < 2 || (majorp == 2 && minorp < 2)) {
+                    isXTestAvailable = False;
+            } else {
+                XTestGrabControl(xdisplay, True);
+            }
+        }
+        checkDone = TRUE;
+    }
+    if (!isXTestAvailable) {
+        jclass cls = env->FindClass("java/lang/UnsupportedOperationException");
+        if (env->ExceptionCheck()) {
+            return;
+        }
+        env->ThrowNew(cls, "Glass Robot needs XTest extension to work");
+    }
+}
+
+static void keyButton(jint code, gboolean press) {
+    Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+
+    gint gdk_keyval = find_gdk_keyval_for_glass_keycode(code);
+    GdkKeymapKey *keys;
+    gint n_keys;
+    if (gdk_keyval == -1) {
+        return;
+    }
+
+    gdk_display_map_keyval(gdk_display_get_default(),  gdk_keyval, &keys, &n_keys);
+//    gdk_keymap_get_entries_for_keyval(gdk_keymap_get_default(),
+//            gdk_keyval, &keys, &n_keys);
+    if (n_keys < 1) {
+        return;
+    }
+
+    XTestFakeKeyEvent(xdisplay,
+                      keys[0].keycode,
+                      press ? True : False,
+                      CurrentTime);
+    g_free(keys);
+    XSync(xdisplay, False);
+}
 
 extern "C" {
 
@@ -53,6 +119,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1keyPress
 {
     (void)obj;
 
+    checkXTest(env);
+    keyButton(code, TRUE);
 }
 
 /*
@@ -65,6 +133,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1keyRelease
 {
     (void)obj;
 
+    checkXTest(env);
+    keyButton(code, FALSE);
 }
 
 /*
@@ -77,6 +147,42 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mouseMove
 {
     (void)obj;
 
+    Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+
+    checkXTest(env);
+    //TODO
+    jfloat uiScale = 1; // getUIScale(gdk_screen_get_default());
+    x = rint(x * uiScale);
+    y = rint(y * uiScale);
+    XWarpPointer(xdisplay,
+            None,
+                XRootWindow(xdisplay, DefaultScreen(xdisplay)),
+            0, 0, 0, 0, x, y);
+    XSync(xdisplay, False);
+}
+
+static void mouseButtons(jint buttons, gboolean press)
+{
+    Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+
+
+    if (buttons & com_sun_glass_ui_GlassRobot_MOUSE_LEFT_BTN) {
+        XTestFakeButtonEvent(xdisplay, 1, press, CurrentTime);
+    }
+    if (buttons & com_sun_glass_ui_GlassRobot_MOUSE_MIDDLE_BTN) {
+        XTestFakeButtonEvent(xdisplay, 2, press, CurrentTime);
+    }
+    if (buttons & com_sun_glass_ui_GlassRobot_MOUSE_RIGHT_BTN) {
+        XTestFakeButtonEvent(xdisplay, 3, press, CurrentTime);
+    }
+    if (buttons & com_sun_glass_ui_GlassRobot_MOUSE_BACK_BTN) {
+        XTestFakeButtonEvent(xdisplay, MOUSE_BACK_BTN, press, CurrentTime);
+    }
+    if (buttons & com_sun_glass_ui_GlassRobot_MOUSE_FORWARD_BTN) {
+        XTestFakeButtonEvent(xdisplay, MOUSE_FORWARD_BTN, press, CurrentTime);
+    }
+
+    XSync(xdisplay, False);
 }
 
 /*
@@ -89,6 +195,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mousePress
 {
     (void)obj;
 
+    checkXTest(env);
+    mouseButtons(buttons, TRUE);
 }
 
 /*
@@ -101,6 +209,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mouseRelease
 {
     (void)obj;
 
+    checkXTest(env);
+    mouseButtons(buttons, FALSE);
 }
 
 /*
@@ -113,6 +223,17 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mouseWheel
 {
     (void)obj;
 
+    Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+    int repeat = abs(amt);
+    int button = amt < 0 ? 4 : 5;
+    int i;
+
+    checkXTest(env);
+    for (i = 0; i < repeat; i++) {
+        XTestFakeButtonEvent(xdisplay, button, True, CurrentTime);
+        XTestFakeButtonEvent(xdisplay, button, False, CurrentTime);
+    }
+    XSync(xdisplay, False);
 }
 
 /*
@@ -126,7 +247,11 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1getMouseX
     (void)env;
     (void)obj;
 
-    return 0;
+    jint x, y;
+    getXPointerPos(&x, &y);
+//TODO
+//    x = rint(x / getUIScale(gdk_screen_get_default()));
+    return x;
 }
 
 /*
@@ -140,7 +265,13 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1getMouseY
     (void)env;
     (void)obj;
 
-    return 0;
+    jint x, y;
+    getXPointerPos(&x, &y);
+
+//TODO
+//    y = rint(y / getUIScale(gdk_screen_get_default()));
+
+   return y;
 }
 
 /*
@@ -153,6 +284,18 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1getScreenCapture
 {
     (void)obj;
 
+//    GdkPixbuf *screenshot, *tmp;
+//    GdkWindow *root_window = gdk_get_default_root_window();
+//
+//    tmp = glass_pixbuf_from_window(root_window, x, y, width, height);
+//    screenshot = gdk_pixbuf_add_alpha(tmp, FALSE, 0, 0, 0);
+//    g_object_unref(tmp);
+//
+//    jint *pixels = (jint *)convert_BGRA_to_RGBA((int*)gdk_pixbuf_get_pixels(screenshot), width * 4, height);
+//    env->SetIntArrayRegion(data, 0, height * width, pixels);
+//    g_free(pixels);
+//
+//    g_object_unref(screenshot);
 }
 
 } // extern "C"

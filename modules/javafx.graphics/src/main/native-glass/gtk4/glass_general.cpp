@@ -625,7 +625,7 @@ configure_opaque_window(GtkWidget *window) {
 //{
 //    GdkPixbuf * ret = NULL;
 //
-//    return gdk_pixbuf_get_from_window (window, srcx, srcy, width, height);
+//    return gdk_pixbuf_get_from_window (window, srcx, srcy, width, height);''''''''''''''''''''
 //}
 
 void glass_gdk_x11_display_set_window_scale (GdkDisplay *display,
