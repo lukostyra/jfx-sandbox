@@ -41,8 +41,12 @@
 #define MOUSE_BACK_BTN 8
 #define MOUSE_FORWARD_BTN 9
 
+static Display* getXDisplay() {
+     return GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+}
+
 static void getXPointerPos(int *x, int *y) {
-    Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+    Display *xdisplay = getXDisplay();
 
     Window child_win, root_win;
     int win_x, win_y;
@@ -58,7 +62,7 @@ static void checkXTest(JNIEnv* env) {
     static int32_t isXTestAvailable;
     static gboolean checkDone = FALSE;
     if (!checkDone) {
-        Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+        Display *xdisplay = getXDisplay();
 
         /* check if XTest is available */
         isXTestAvailable = XQueryExtension(xdisplay, XTestExtensionName, &major_opcode, &first_event, &first_error);
@@ -83,7 +87,7 @@ static void checkXTest(JNIEnv* env) {
 }
 
 static void keyButton(jint code, gboolean press) {
-    Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+    Display *xdisplay = getXDisplay();
 
     gint gdk_keyval = find_gdk_keyval_for_glass_keycode(code);
     GdkKeymapKey *keys;
@@ -147,24 +151,23 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mouseMove
 {
     (void)obj;
 
-    Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+    Display *xdisplay = getXDisplay();
 
     checkXTest(env);
     //TODO
     jfloat uiScale = 1; // getUIScale(gdk_screen_get_default());
     x = rint(x * uiScale);
     y = rint(y * uiScale);
-    XWarpPointer(xdisplay,
-            None,
+    XWarpPointer(xdisplay, None,
                 XRootWindow(xdisplay, DefaultScreen(xdisplay)),
-            0, 0, 0, 0, x, y);
+                0, 0, 0, 0, x, y);
+
     XSync(xdisplay, False);
 }
 
 static void mouseButtons(jint buttons, gboolean press)
 {
-    Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
-
+    Display *xdisplay = getXDisplay();
 
     if (buttons & com_sun_glass_ui_GlassRobot_MOUSE_LEFT_BTN) {
         XTestFakeButtonEvent(xdisplay, 1, press, CurrentTime);
@@ -223,7 +226,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mouseWheel
 {
     (void)obj;
 
-    Display *xdisplay = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+    Display *xdisplay = getXDisplay();
     int repeat = abs(amt);
     int button = amt < 0 ? 4 : 5;
     int i;
