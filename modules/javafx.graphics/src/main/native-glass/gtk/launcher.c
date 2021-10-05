@@ -48,11 +48,15 @@
 static jboolean gtk_versionDebug = JNI_FALSE;
 
 static const char * gtk2_chain[] = {
-   "libglassgtk2.so", "libglassgtk3.so", 0
+    "libglassgtk2.so", "libglassgtk3.so", 0
 };
 
 static const char * gtk3_chain[] = {
-   "libglassgtk3.so", "libglassgtk2.so", 0
+    "libglassgtk3.so", "libglassgtk2.so", 0
+};
+
+static const char * gtk4_chain[] = {
+    "libglassgtk4.so", "libglassgtk3.so", 0
 };
 
 static JavaVM* javaVM;
@@ -75,19 +79,23 @@ JNI_OnLoad(JavaVM *jvm, void *reserved)
 // "version" "libgtk", "libdgdk", "libpixbuf"
 // note that currently only the first char of the version is used
 static char * gtk2_versioned[] = {
-   "2", "libgtk-x11-2.0.so.0"
+    "2", "libgtk-x11-2.0.so.0"
 };
 
 static char * gtk2_not_versioned[] = {
-   "2", "libgtk-x11-2.0.so"
+    "2", "libgtk-x11-2.0.so"
 };
 
 static char * gtk3_versioned[] = {
-   "3", "libgtk-3.so.0"
+    "3", "libgtk-3.so.0"
 };
 
 static char * gtk3_not_versioned[] = {
-   "3", "libgtk-3.so"
+    "3", "libgtk-3.so"
+};
+
+static char * gtk4_not_versioned[] = {
+    "4", "libgtk-4.so"
 };
 
 // our library set orders defined, null terminated
@@ -103,8 +111,13 @@ static char ** three_to_two[] = {
     0
 };
 
-static int try_opening_libraries(char *names[3])
-{
+static char ** four_to_three[] = {
+    gtk4_not_versioned,
+    gtk3_versioned, gtk3_not_versioned,
+    0
+};
+
+static int try_opening_libraries(char *names[3]) {
     void * gtk;
 
     gtk = dlopen (names[1], RTLD_LAZY | RTLD_GLOBAL);
@@ -115,8 +128,7 @@ static int try_opening_libraries(char *names[3])
     return 1;
 }
 
-static int try_libraries_noload(char *names[3])
-{
+static int try_libraries_noload(char *names[3]) {
 #ifdef RTLD_NOLOAD
     void *gtk;
     gtk = dlopen(names[1], RTLD_LAZY | RTLD_NOLOAD);
@@ -127,13 +139,12 @@ static int try_libraries_noload(char *names[3])
 }
 
 static int sniffLibs(int wantVersion) {
-
      if (gtk_versionDebug) {
          printf("checking GTK version %d\n",wantVersion);
      }
 
      int success = 1;
-     char *** use_chain = three_to_two;
+     char *** use_chain = four_to_three;
      int i, found = 0;
 
      //at first try to detect already loaded GTK version
@@ -147,6 +158,8 @@ static int sniffLibs(int wantVersion) {
      if (!found) {
          if (wantVersion == 0 || wantVersion == 3) {
              use_chain = three_to_two;
+         } else if (wantVersion == 4) {
+             use_chain = four_to_three;
          } else if (wantVersion == 2) {
              use_chain = two_to_three;
          } else {
@@ -213,6 +226,8 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1queryLibrary
         return com_sun_glass_ui_gtk_GtkApplication_QUERY_LOAD_GTK2;
     } else if (version == '3') {
         return com_sun_glass_ui_gtk_GtkApplication_QUERY_LOAD_GTK3;
+    } else if (version == '4') {
+        return com_sun_glass_ui_gtk_GtkApplication_QUERY_LOAD_GTK4;
     }
 
     return com_sun_glass_ui_gtk_GtkApplication_QUERY_ERROR;

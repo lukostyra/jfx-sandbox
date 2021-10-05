@@ -152,7 +152,9 @@ final class GtkApplication extends Application implements
             AccessController.doPrivileged((PrivilegedAction<Integer>) () -> {
                 String v = System.getProperty("jdk.gtk.version","3");
                 int ret = 0;
-                if ("3".equals(v) || v.startsWith("3.")) {
+                if ("4".equals(v) || v.startsWith("4.")) {
+                    ret = 4;
+                } else if ("3".equals(v) || v.startsWith("3.")) {
                     ret = 3;
                 } else if ("2".equals(v) || v.startsWith("2.")) {
                     ret = 2;
@@ -193,7 +195,12 @@ final class GtkApplication extends Application implements
                     System.out.println("Glass GTK library to load is glassgtk3");
                 }
                 NativeLibLoader.loadLibrary("glassgtk3");
-            } else {
+            } else if (libraryToLoad == QUERY_LOAD_GTK4) {
+                if (gtkVersionVerbose) {
+                    System.out.println("Glass GTK library to load is glassgtk4");
+                }
+                NativeLibLoader.loadLibrary("glassgtk4");
+            }  else {
                 throw new UnsupportedOperationException("Internal Error");
             }
             return null;
@@ -222,6 +229,7 @@ final class GtkApplication extends Application implements
     @Native private static final int QUERY_USE_CURRENT = 1;
     @Native private static final int QUERY_LOAD_GTK2 = 2;
     @Native private static final int QUERY_LOAD_GTK3 = 3;
+    @Native private static final int QUERY_LOAD_GTK4 = 4;
     /*
      * check the system and return an indication of which library to load
      *  return values are the QUERY_ constants

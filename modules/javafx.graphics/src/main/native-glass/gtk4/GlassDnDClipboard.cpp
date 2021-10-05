@@ -26,7 +26,7 @@
 #include "glass_general.h"
 //#include "glass_dnd.h"
 
-extern gboolean is_dnd_owner;
+//extern gboolean is_dnd_owner;
 extern "C" {
 
 /*
@@ -56,9 +56,8 @@ Java_com_sun_glass_ui_gtk_GtkDnDClipboard_pushToSystemImpl
 {
     (void)obj;
 
-
-//    return execute_dnd(env, data, supported);
-//TODO
+    //return execute_dnd(env, data, supported);
+    //TODO
     return 0;
 }
 
@@ -87,8 +86,8 @@ JNIEXPORT jobject JNICALL Java_com_sun_glass_ui_gtk_GtkDnDClipboard_popFromSyste
 {
     (void)obj;
 
-//    return dnd_target_get_data(env, mime);
-//TODO
+    //return dnd_target_get_data(env, mime);
+    //TODO
     return NULL;
 }
 
@@ -102,9 +101,9 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkDnDClipboard_supportedSource
 {
     (void)obj;
 
-//    return dnd_target_get_supported_actions(env);
-//TODO
-    return 1;
+    //return dnd_target_get_supported_actions(env);
+    //TODO
+    return 0;
 }
 
 /*
@@ -117,8 +116,8 @@ JNIEXPORT jobjectArray JNICALL Java_com_sun_glass_ui_gtk_GtkDnDClipboard_mimesFr
 {
     (void)obj;
 
-//    return dnd_target_get_mimes(env);
-//TODO
+    //return dnd_target_get_mimes(env);
+    //TODO
     return NULL;
 }
 

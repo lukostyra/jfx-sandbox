@@ -62,6 +62,7 @@ def cppFlags = [
 def cFlags = [cppFlags, "-Werror=implicit-function-declaration"].flatten()
 
 def ccFlagsGTK3 = cppFlags
+
 //ccFlags.addAll(["-Wnon-virtual-dtor", "-Woverloaded-virtual", "-std=c++0x"])
 def dynamicLinkFlags = ["-static-libgcc", "-static-libstdc++", "-shared", commonFlags,
                  "-z", "relro",
@@ -84,8 +85,10 @@ if (hasProperty('toolchainDir')) {
 
 def gtk2CCFlags = [ "-Wno-deprecated-declarations" ];
 def gtk3CCFlags = [ "-Wno-deprecated-declarations" ];
+def gtk4CCFlags = [ "-Wno-deprecated-declarations" ];
 def gtk2LinkFlags = [ ];
 def gtk3LinkFlags = [ ];
+def gtk4LinkFlags = [ ];
 
 // Create $buildDir/linux_tools.properties file and load props from it
 setupTools("linux_gtk2",
@@ -143,6 +146,35 @@ setupTools("linux_gtk3",
             throw new IllegalStateException("GTK3 development packages not found. If GTK3 packages are installed, please remove the build directory and try again.")
         }
     }
+)
+
+setupTools("linux_gtk4",
+        { propFile ->
+            ByteArrayOutputStream results2 = new ByteArrayOutputStream();
+            exec {
+                commandLine("${toolchainDir}pkg-config", "--cflags", "gtk4", "gthread-2.0", "xtst")
+                setStandardOutput(results2);
+            }
+            propFile << "cflagsGTK4=" << results2.toString().trim() << "\n";
+
+            ByteArrayOutputStream results4 = new ByteArrayOutputStream();
+            exec {
+                commandLine("${toolchainDir}pkg-config", "--libs", "gtk4", "gthread-2.0", "xtst")
+                setStandardOutput(results4);
+            }
+            propFile << "libsGTK4=" << results4.toString().trim()  << "\n";
+
+        },
+        { properties ->
+            def cflagsGTK4 = properties.getProperty("cflagsGTK4")
+            def libsGTK4 = properties.getProperty("libsGTK4")
+            if (cflagsGTK4 && libsGTK4) {
+                gtk4CCFlags.addAll(cflagsGTK4.split(" "))
+                gtk4LinkFlags.addAll(libsGTK4.split(" "))
+            } else {
+                throw new IllegalStateException("GTK4 development packages not found. If GTK4 packages are installed, please remove the build directory and try again.")
+            }
+        }
 )
 
 def pangoCCFlags = ["-D_ENABLE_PANGO"];
@@ -212,7 +244,7 @@ def compiler = IS_COMPILE_PARFAIT ? "parfait-gcc" : "${toolchainDir}gcc";
 def linker = IS_STATIC_BUILD ? "ar" : IS_COMPILE_PARFAIT ? "parfait-g++" : "${toolchainDir}g++";
 
 LINUX.glass = [:]
-LINUX.glass.variants = ["glass", "glassgtk2", "glassgtk3"]
+LINUX.glass.variants = ["glass", "glassgtk2", "glassgtk3", "glassgtk4"]
 
 FileTree ft_gtk_launcher = fileTree("${project(":graphics").projectDir}/src/main/native-glass/gtk/") {
     include("**/launcher.c")
@@ -221,6 +253,11 @@ FileTree ft_gtk_launcher = fileTree("${project(":graphics").projectDir}/src/main
 FileTree ft_gtk = fileTree("${project(":graphics").projectDir}/src/main/native-glass/gtk/") {
     exclude("**/launcher.c")
 }
+
+FileTree ft_gtk4 = fileTree("${project(":graphics").projectDir}/src/main/native-glass/gtk4/") {
+    exclude("**/launcher.c", "**/glass_dnd.cpp", "**/glass_dnd.h", "**/glass_window_ime.cpp",  "**/glass_window_ime.h")
+}
+
 
 LINUX.glass.glass = [:]
 LINUX.glass.glass.nativeSource = ft_gtk_launcher.getFiles()
@@ -249,6 +286,17 @@ LINUX.glass.glassgtk3.ccFlags = IS_STATIC_BUILD ?
 LINUX.glass.glassgtk3.linker = linker
 LINUX.glass.glassgtk3.linkFlags = IS_STATIC_BUILD ? linkFlags : [linkFlags, gtk3LinkFlags].flatten()
 LINUX.glass.glassgtk3.lib = "glassgtk3"
+
+LINUX.glass.glassgtk4 = [:]
+LINUX.glass.glassgtk4.nativeSource =  ft_gtk4.getFiles()
+LINUX.glass.glassgtk4.compiler = compiler
+LINUX.glass.glassgtk4.ccFlags = IS_STATIC_BUILD ?
+        ["-fno-threadsafe-statics", ccFlags, gtk4CCFlags].flatten() :
+        [cppFlags, gtk4CCFlags, "-Werror"].flatten()
+LINUX.glass.glassgtk4.linker = linker
+LINUX.glass.glassgtk4.linkFlags = IS_STATIC_BUILD ? linkFlags : [linkFlags, gtk4LinkFlags].flatten()
+LINUX.glass.glassgtk4.lib = "glassgtk4"
+
 
 LINUX.decora = [:]
 LINUX.decora.compiler = compiler
