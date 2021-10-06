@@ -65,8 +65,8 @@ struct BgColor {
     bool is_set;
 };
 
-struct WindowGeometry {
-    WindowGeometry() : current_x(0),
+struct WindowBounds {
+    WindowBounds() : current_x(0),
                        current_y(0),
                        current_w(0),
                        current_h(0),
@@ -75,13 +75,7 @@ struct WindowGeometry {
                        last_cw(0),
                        last_ch(0),
                        view_x(0),
-                       view_y(0),
-                       enabled(true),
-                       resizable(true),
-                       minw(-1),
-                       minh(-1),
-                       maxw(-1),
-                       maxh(-1) {}
+                       view_y(0) {}
 
     int current_x; // current position X
     int current_y; // current position Y
@@ -95,15 +89,6 @@ struct WindowGeometry {
     // The position of the view relative to the window
     int view_x;
     int view_y;
-
-    bool enabled;
-    bool resizable;
-
-    int minw;
-    int minh;
-
-    int maxw;
-    int maxh;
 };
 
 class WindowContext {
@@ -133,7 +118,7 @@ private:
 
     size_t events_processing_cnt;
 
-    WindowGeometry geometry;
+    WindowBounds bounds;
     std::set<WindowContext *> children;
     cairo_surface_t *cairo_surface;
     GtkWidget *gtk_widget;
@@ -157,7 +142,7 @@ public:
     cairo_surface_t *get_cairo_surface();
     GtkWidget *get_gtk_widget();
     GtkWindow *get_gtk_window();
-    WindowGeometry get_geometry();
+    WindowBounds get_bounds();
     jobject get_jwindow();
     jobject get_jview();
 
