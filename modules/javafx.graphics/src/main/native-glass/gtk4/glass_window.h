@@ -214,12 +214,8 @@ public:
     size_t get_events_count();
     ~WindowContext();
 
-protected:
-    void applyShapeMask(void *, uint width, uint height);
-
 private:
     bool im_filter_keypress(GdkKeyEvent*);
-    void apply_geometry();
     void size_position_notify(bool, bool);
     void update_ontop_tree(bool);
     bool on_top_inherited();

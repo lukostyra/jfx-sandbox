@@ -133,6 +133,7 @@ jfloat getUIScale() {
     return uiScale;
 }
 
+//FIXME: crashes on wayland
 static jobject createJavaScreen(JNIEnv* env, GdkDisplay* display, GdkMonitor *monitor, int monitor_idx) {
 //    GdkRectangle workArea = get_screen_workarea(screen);
 //    LOG4("Work Area: x:%d, y:%d, w:%d, h:%d\n", workArea.x, workArea.y, workArea.width, workArea.height);
@@ -230,9 +231,7 @@ jobjectArray rebuild_screens(JNIEnv* env) {
 
     g_print("Available monitors: %d\n", n_monitors);
 
-    int i;
-
-    for(i = 0; i < n_monitors; i++) {
+    for(int i = 0; i < n_monitors; i++) {
         GdkMonitor *monitor = (GdkMonitor *) g_list_model_get_item(monitors, i);
         env->SetObjectArrayElement(jscreens, i, createJavaScreen(env, display, monitor, i));
         JNI_EXCEPTION_TO_CPP(env)

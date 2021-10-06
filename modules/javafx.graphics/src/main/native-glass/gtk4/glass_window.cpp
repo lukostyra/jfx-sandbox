@@ -103,10 +103,6 @@ static void process_events_cb(GdkEvent* event, gpointer data) {
     EventsCounterHelper helper(ctx);
     try {
         switch (type) {
-//            case GDK_PROPERTY_NOTIFY:
-//                ctx->process_property_notify(event);
-////                gtk_main_do_event(event);
-//                break;
 //            case GDK_CONFIGURE:
 //                ctx->process_configure(event);
 //                gtk_main_do_event(event);
@@ -120,6 +116,7 @@ static void process_events_cb(GdkEvent* event, gpointer data) {
 //                destroy_and_delete_ctx(ctx);
 ////                gtk_main_do_event(event);
 //                break;
+            //TODO: use close_request signal
             case GDK_DELETE:
                 ctx->process_delete();
                 break;
@@ -127,6 +124,7 @@ static void process_events_cb(GdkEvent* event, gpointer data) {
 //            case GDK_DAMAGE:
 //                ctx->process_expose(event);
 //                break;
+//TODO: use fullscreened, maximized signals
 //            case GDK_WINDOW_STATE:
 //                ctx->process_state(event);
 //                gtk_main_do_event(event);
@@ -172,7 +170,9 @@ static void process_events_cb(GdkEvent* event, gpointer data) {
 
 static void realize_cb(GtkWidget* self, gpointer data) {
     g_print("Realized\n");
-    g_signal_connect(self, "event", G_CALLBACK(process_events_cb), data);
+    if (GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(self))) {
+        g_signal_connect(surface, "event", G_CALLBACK(process_events_cb), data);
+    }
 }
 
 static void draw_cb (GtkDrawingArea *drawing_area,
@@ -283,6 +283,7 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext *_owner, long _scre
 }
 
 void WindowContext::paint(void *data, jint width, jint height) {
+    g_print("Paint\n");
     if (cairo_surface) {
         cairo_surface_destroy(cairo_surface);
     }
@@ -331,7 +332,6 @@ jobject WindowContext::get_jview() {
 
 void WindowContext::process_map() {
     map_received = true;
-    apply_geometry();
 }
 
 void WindowContext::process_focus(GdkEvent *event) {
@@ -357,9 +357,6 @@ void WindowContext::process_focus(GdkEvent *event) {
         }
     }
 }
-
-//void WindowContext::process_property_notify(GdkPropertyEvent *event) {
-//}
 
 void WindowContext::process_configure() {
 //    gint x, y, w, h, gtk_w, gtk_h;
@@ -665,7 +662,7 @@ void WindowContext::process_key(GdkEvent *event) {
     }
     jcharArray jChars = NULL;
 
-    jchar key = gdk_keyval_to_unicode(gdk_key_event_get_keyval(GDK_EVENT(event)));
+    jchar key = gdk_keyval_to_unicode(gdk_key_event_get_keyval(event));
 
     if (key >= 'a' && key <= 'z' && (state & GDK_CONTROL_MASK)) {
         key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
@@ -782,16 +779,16 @@ void WindowContext::notify_on_top(bool top) {
 void WindowContext::notify_repaint() {
     if (jview) {
         //TODO: probably get drawing area size
-        GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(gtk_widget));
+        if (GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(gtk_widget))) {
+            int w, h;
+            w = gdk_surface_get_width(surface);
+            h = gdk_surface_get_height(surface);
 
-        int w, h;
-        w = gdk_surface_get_width(surface);
-        h = gdk_surface_get_height(surface);
-
-        mainEnv->CallVoidMethod(jview,
-                                jViewNotifyRepaint,
-                                0, 0, w, h);
-        CHECK_JNI_EXCEPTION(mainEnv);
+            mainEnv->CallVoidMethod(jview,
+                                    jViewNotifyRepaint,
+                                    0, 0, w, h);
+            CHECK_JNI_EXCEPTION(mainEnv);
+        }
     }
 }
 
@@ -834,8 +831,12 @@ bool WindowContext::set_view(jobject view) {
 }
 
 void WindowContext::set_visible(bool visible) {
+    g_print("set_visible\n");
+
     if (visible) {
+        g_print("gtk_widget_show\n");
         gtk_widget_show(gtk_widget);
+        visible_received = TRUE;
     } else {
         gtk_widget_hide(gtk_widget);
         if (jview && is_mouse_entered) {
@@ -852,20 +853,17 @@ void WindowContext::set_visible(bool visible) {
         }
     }
 
-    if (visible) {
-        visible_received = TRUE;
-    }
-
     //JDK-8220272 - fire event first because GDK_FOCUS_CHANGE is not always in order
-    if (visible && jwindow && isEnabled()) {
-        mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus, com_sun_glass_events_WindowEvent_FOCUS_GAINED);
-        CHECK_JNI_EXCEPTION(mainEnv);
-    }
+//    if (visible && jwindow && isEnabled()) {
+//        mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus, com_sun_glass_events_WindowEvent_FOCUS_GAINED);
+//        CHECK_JNI_EXCEPTION(mainEnv);
+//    }
 }
 
 void WindowContext::set_cursor(GdkCursor *cursor) {
-    GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(gtk_widget));
-    gdk_surface_set_cursor(surface, cursor);
+    if (GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(gtk_widget))) {
+        gdk_surface_set_cursor(surface, cursor);
+    }
 }
 
 void WindowContext::set_level(int level) {
@@ -915,17 +913,14 @@ void WindowContext::set_maximized(bool maximize) {
     is_maximized = maximize;
 
     if (maximize) {
-        // enable the functionality
-//        GdkWMFunction wmf = (GdkWMFunction)(gdk_windowManagerFunctions | GDK_FUNC_MAXIMIZE);
-//        gdk_window_set_functions(gdk_window, wmf);
-
-//        gtk_window_maximize(GTK_WINDOW(gtk_window));
+        gtk_window_maximize(GTK_WINDOW(gtk_widget));
     } else {
-//        gtk_window_unmaximize(GTK_WINDOW(gtk_window));
+        gtk_window_unmaximize(GTK_WINDOW(gtk_widget));
     }
 }
 
 void WindowContext::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h, int cw, int ch) {
+    g_print("set_bounds: %d, %d, %d, %d, %d, %d\n", x, y, w, h, cw, ch);
     int newW, newH;
 
     geometry.current_w = w;
@@ -938,31 +933,31 @@ void WindowContext::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h,
 
     if (cw > -1 || w > -1) {
         size_changed = TRUE;
-        apply_geometry();
 
         if (cw > -1) {
-            gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(drawing_area), w);
-            gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(drawing_area), h);
+            gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(drawing_area), cw);
+            gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(drawing_area), ch);
         }
 
         if (w > -1) {
+            g_print("gtk_window_set_default_size: %d, %d\n", w, h);
             gtk_window_set_default_size(GTK_WINDOW(gtk_widget), w, h);
         }
     }
 
-    if (xSet || ySet) {
-        int newX = (xSet) ? x : geometry.current_x;
-        int newY = (ySet) ? y : geometry.current_y;
-
-        if (newX != geometry.current_x || newY != geometry.current_y) {
-            pos_changed = TRUE;
-            geometry.current_x = newX;
-            geometry.current_y = newY;
-
-// TODO: use X11
-//            gtk_window_move(GTK_WINDOW(gtk_window), newX, newY);
-        }
-    }
+//    if (xSet || ySet) {
+//        int newX = (xSet) ? x : geometry.current_x;
+//        int newY = (ySet) ? y : geometry.current_y;
+//
+//        if (newX != geometry.current_x || newY != geometry.current_y) {
+//            pos_changed = TRUE;
+//            geometry.current_x = newX;
+//            geometry.current_y = newY;
+//
+//// TODO: use X11
+////            gtk_window_move(GTK_WINDOW(gtk_window), newX, newY);
+//        }
+//    }
 
     size_position_notify(size_changed, pos_changed);
 }
@@ -970,29 +965,30 @@ void WindowContext::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h,
 void WindowContext::set_resizable(bool res) {
     if (res != geometry.resizable) {
         geometry.resizable = res;
-        apply_geometry();
     }
 }
 
 void WindowContext::set_focusable(bool focusable) {
+    g_print("set_focusable\n");
 //    gtk_window_set_accept_focus(GTK_WINDOW(gtk_window)), focusable ? TRUE : FALSE);
     gtk_widget_set_can_focus(gtk_widget, focusable ? TRUE : FALSE);
 }
 
 void WindowContext::set_title(const char *title) {
+    g_print("set title: %s\n", title);
     gtk_window_set_title(GTK_WINDOW(gtk_widget), title);
 }
 
 void WindowContext::set_alpha(double alpha) {
+    g_print("set alpha: %f\n", alpha);
     gtk_widget_set_opacity(gtk_widget, (gdouble)alpha);
 }
 
 void WindowContext::set_enabled(bool enabled) {
-    if (enabled != geometry.enabled) {
-        gtk_widget_set_sensitive(gtk_widget, enabled);
-        geometry.enabled = enabled;
-        apply_geometry();
-    }
+//    if (enabled != geometry.enabled) {
+//        gtk_widget_set_sensitive(gtk_widget, enabled);
+//        geometry.enabled = enabled;
+//    }
 }
 
 void WindowContext::set_minimum_size(int w, int h) {
@@ -1004,8 +1000,6 @@ void WindowContext::set_minimum_size(int w, int h) {
 
     geometry.minw = w;
     geometry.minh = h;
-
-    apply_geometry();
 }
 
 void WindowContext::set_maximum_size(int w, int h) {
@@ -1017,8 +1011,6 @@ void WindowContext::set_maximum_size(int w, int h) {
 
     geometry.maxw = w;
     geometry.maxh = h;
-
-    apply_geometry();
 }
 
 void WindowContext::set_icon(GdkPixbuf *pixbuf) {
@@ -1062,6 +1054,7 @@ void WindowContext::show_or_hide_children(bool show) {
 }
 
 bool WindowContext::is_visible() {
+    g_print("is_visible\n");
     return gtk_widget_get_visible(gtk_widget);
 }
 
@@ -1118,50 +1111,7 @@ size_t WindowContext::get_events_count() {
     return events_processing_cnt;
 }
 
-///////////////////////// PROTECTED
-
-void WindowContext::applyShapeMask(void *data, uint width, uint height) {
-    if (frame_type != TRANSPARENT) {
-        return;
-    }
-}
-
 ///////////////////////// PRIVATE
-
-void WindowContext::apply_geometry() {
-//FIXME: Removed
-//    if (!map_received) {
-//        return;
-//    }
-//
-//    GdkGeometry gdk_geometry;
-//    gdk_geometry.win_gravity = GDK_GRAVITY_NORTH_WEST;
-//
-//    //FIXME: probably wrong
-//    if ((!geometry.resizable || !geometry.enabled) && !(is_maximized || is_fullscreen)) {
-//        // not resizeable
-//        int w = geometry.current_cw > 0
-//                ? geometry.current_cw
-//                : geometry.current_w;
-//
-//        int h = geometry.current_ch > 0
-//                ? geometry.current_ch
-//                : geometry.current_h;
-//
-//        gdk_geometry.min_width = gdk_geometry.max_width = w;
-//        gdk_geometry.min_height = gdk_geometry.max_height = h;
-//    } else {
-//        //min/max width/height always whole window size (with decors)
-//        gdk_geometry.min_width = geometry.minw > 0 ? geometry.minw  : 1;
-//        gdk_geometry.min_height = geometry.minh > 0 ? geometry.minh : 1;
-//
-//        gdk_geometry.max_width = geometry.maxw > 0 ? geometry.maxw : G_MAXINT;
-//        gdk_geometry.max_height = geometry.maxh > 0 ? geometry.maxh : G_MAXINT;
-//    }
-//    gtk_window_set_geometry_hints(GTK_WINDOW(gtk_window), NULL, &gdk_geometry,
-//                                  (GdkWindowHints)(GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE | GDK_HINT_WIN_GRAVITY));
-}
-
 void WindowContext::size_position_notify(bool size_changed, bool pos_changed) {
 
     if (jview) {

@@ -177,9 +177,10 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1runLoop
     CHECK_JNI_EXCEPTION(mainEnv);
 
     mainLoop = g_main_loop_new(NULL, FALSE);
-    g_main_loop_run(mainLoop);
-
     g_print("run loop\n");
+    g_main_loop_run(mainLoop);
+    g_print("unref loop\n");
+    g_main_loop_unref(mainLoop);
 }
 
 /*
@@ -193,8 +194,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1terminateLoop
     (void)env;
     (void)obj;
 
-    g_main_loop_unref(mainLoop);
     g_print("terminateLoop\n");
+    g_main_loop_unref(mainLoop);
 }
 
 /*
@@ -207,6 +208,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1submitForLater
 {
     (void)obj;
 
+    g_print("submitForLaterInvocation\n");
     RunnableContext* context = (RunnableContext*)malloc(sizeof(RunnableContext));
     context->runnable = env->NewGlobalRef(runnable);
     g_idle_add_full(G_PRIORITY_HIGH_IDLE + 30, call_runnable, context, NULL);
