@@ -23,9 +23,7 @@
  * questions.
  */
 #include <X11/Xlib.h>
-#include <X11/Xatom.h>
 #include <gdk/gdk.h>
-//#include <gdk/gdkx.h>
 #include <gtk/gtk.h>
 #include <glib.h>
 
@@ -46,6 +44,7 @@
 JNIEnv* mainEnv; // Use only with main loop thread!!!
 
 extern gboolean disableGrab;
+static GMainLoop *mainLoop = NULL;
 
 static gboolean call_runnable (gpointer data)
 {
@@ -68,21 +67,6 @@ static gboolean call_runnable (gpointer data)
 
     return FALSE;
 }
-
-static GtkApplication *app = NULL;
-
-static void activate(GApplication *app) {
-    g_print("App activated\n");
-}
-
-//static gboolean invoke(gpointer data) {
-//    jobject launchable = (jobject) data;
-//
-//    mainEnv->CallVoidMethod(launchable, jRunnableRun);
-//    CHECK_JNI_EXCEPTION_RET(mainEnv, FALSE);
-//
-//    return FALSE;
-//}
 
 
 extern "C" {
@@ -107,17 +91,19 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
 
     g_print("initGtk\n");
 
+    gtk_init();
+
 //    gchar * app_name = get_application_name();
 //    g_print("initGtk %s\n", app_name);
 
-    app = gtk_application_new(NULL, G_APPLICATION_FLAGS_NONE);
+//    app = gtk_application_new(NULL, G_APPLICATION_FLAGS_NONE);
 
 //    if (app_name) {
 //        g_free(app_name);
 //    }
 
-    g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
-    g_application_run(G_APPLICATION(app), 0, NULL);
+//    g_signal_connect(app, "activate", G_CALLBACK(activate), NULL);
+//    g_application_run(G_APPLICATION(app), 0, NULL);
 
     return JNI_TRUE;
 }
@@ -190,8 +176,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1runLoop
     mainEnv->CallVoidMethod(launchable, jRunnableRun);
     CHECK_JNI_EXCEPTION(mainEnv);
 
-
-//    g_main_context_iteration(NULL, TRUE);
+    mainLoop = g_main_loop_new(NULL, FALSE);
+    g_main_loop_run(mainLoop);
 
     g_print("run loop\n");
 }
@@ -207,6 +193,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1terminateLoop
     (void)env;
     (void)obj;
 
+    g_main_loop_unref(mainLoop);
     g_print("terminateLoop\n");
 }
 
@@ -237,7 +224,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication_enterNestedEvent
     (void)obj;
 
     g_print("enterNestedEventLoopImpl\n");
-
+    g_main_loop_ref(mainLoop);
 }
 
 /*
@@ -252,7 +239,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication_leaveNestedEvent
     (void)obj;
 
     g_print("leaveNestedEventLoopImpl\n");
-
+    g_main_loop_unref(mainLoop);
 }
 
 /*
