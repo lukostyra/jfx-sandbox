@@ -36,7 +36,6 @@
 
 #include <X11/extensions/shape.h>
 #include <cairo.h>
-//#include <cairo-xlib.h>
 #include <gdk/gdk.h>
 
 #include <string.h>
@@ -74,6 +73,12 @@ static inline jint gtk_button_number_to_mouse_button(guint button) {
             // Other buttons are not supported by quantum and are not reported by other platforms
             return com_sun_glass_events_MouseEvent_BUTTON_NONE;
     }
+}
+
+static void map_cb (GtkWidget* self, gpointer data) {
+    g_print("map_cb\n");
+    WindowContext *ctx = (WindowContext *)data;
+    ctx->process_map();
 }
 
 static void process_events_cb(GdkEvent* event, gpointer data) {
@@ -151,9 +156,6 @@ static void process_events_cb(GdkEvent* event, gpointer data) {
 //            case GDK_DRAG_MOTION:
 //                process_dnd_target(ctx, &event->dnd);
 //                break;
-//            case GDK_MAP:
-//                ctx->process_map();
-                // fall-through
 //            case GDK_UNMAP:
 //            case GDK_CLIENT_EVENT:
 //            case GDK_VISIBILITY_NOTIFY:
@@ -168,11 +170,18 @@ static void process_events_cb(GdkEvent* event, gpointer data) {
     }
 }
 
+static void realize_cb(GtkWidget* self, gpointer data) {
+    g_print("Realized\n");
+    g_signal_connect(self, "event", G_CALLBACK(process_events_cb), data);
+}
+
 static void draw_cb (GtkDrawingArea *drawing_area,
                      cairo_t        *cr,
                      int             width,
                      int             height,
                      gpointer        data) {
+
+    g_print("Draw\n");
 
     cairo_surface_t *surface = ((WindowContext *)data)->get_cairo_surface();
 
@@ -210,11 +219,18 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext *_owner, long _scre
 
     //the actual widget is a drawing area
     gtk_widget = gtk_window_new();
+
+    g_signal_connect(gtk_widget, "realize", G_CALLBACK(realize_cb), this);
+    g_signal_connect(gtk_widget, "map", G_CALLBACK(map_cb), this);
+
+    g_print("Phase 1...\n");
     drawing_area = gtk_drawing_area_new();
     gtk_widget_set_halign(drawing_area, GTK_ALIGN_FILL);
     gtk_widget_set_valign(drawing_area, GTK_ALIGN_FILL);
     gtk_window_set_child(GTK_WINDOW(gtk_widget), drawing_area);
     gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_cb, this, NULL);
+
+    g_print("Phase 2...\n");
 
     if (type == POPUP) {
 //        gtk_window_set_skip_taskbar_hint(GTK_WINDOW(gtk_widget), TRUE);
@@ -237,11 +253,6 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext *_owner, long _scre
         }
     }
 
-    //FIXME
-    gdk_surface = gtk_native_get_surface(GTK_NATIVE(gtk_widget));
-
-    g_signal_connect(gdk_surface, "event", G_CALLBACK(process_events_cb), this);
-
     // This allows to group Windows (based on WM_CLASS). Use the fully qualified
     // JavaFX Application class as StartupWMClass on the .desktop launcher
 //    if (gchar * app_name = get_application_name()) {
@@ -260,19 +271,7 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext *_owner, long _scre
 //        gtk_window_set_type_hint(GTK_WINDOW(gtk_window), GDK_WINDOW_TYPE_HINT_UTILITY);
     }
 
-//    glong xvisualID = (glong) mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
-
-//    if (xvisualID != 0) {
-//        GdkVisual *visual = gdk_x11_screen_lookup_visual(gdk_screen_get_default(), xvisualID);
-//        glass_gtk_window_configure_from_visual(gtk_widget, visual);
-//    }
-
-//    gtk_widget_set_events(gtk_widget, GDK_ALL_EVENTS_MASK);
-//    gtk_widget_set_app_paintable(gtk_widget, TRUE);
-
-//    glass_gtk_configure_transparency_and_realize(gtk_widget, frame_type == TRANSPARENT);
     gtk_window_set_title(GTK_WINDOW(gtk_widget), "");
-
     g_object_set_data_full(G_OBJECT(gtk_widget), GDK_WINDOW_DATA_CONTEXT, this, NULL);
 
 //    glass_dnd_attach_context(this);
@@ -281,9 +280,6 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext *_owner, long _scre
 //    if (wmf) {
 //        gdk_window_set_functions(gdk_window, wmf);
 //    }
-
-//TODO: signal events are not exposed on gtk4
-//    connect_signals(gtk_widget, this);
 }
 
 void WindowContext::paint(void *data, jint width, jint height) {
@@ -311,10 +307,6 @@ bool WindowContext::isEnabled() {
 
 cairo_surface_t *WindowContext::get_cairo_surface() {
     return cairo_surface;
-}
-
-GdkSurface *WindowContext::get_gdk_surface() {
-    return gdk_surface;
 }
 
 GtkWidget *WindowContext::get_gtk_widget() {
@@ -751,7 +743,7 @@ void WindowContext::process_key(GdkEvent *event) {
 
 void WindowContext::process_screen_changed() {
 //FIXME
-    GdkMonitor *monitor = gdk_display_get_monitor_at_surface(gdk_display_get_default(), gdk_surface);
+//    GdkMonitor *monitor = gdk_display_get_monitor_at_surface(gdk_display_get_default(), gdk_surface);
 
 //    glong to_screen = getScreenPtrForLocation(geometry.current_x, geometry.current_y);
 //
@@ -788,11 +780,14 @@ void WindowContext::notify_on_top(bool top) {
 }
 
 void WindowContext::notify_repaint() {
-    int w, h;
-    w = gdk_surface_get_width(gdk_surface);
-    h = gdk_surface_get_height(gdk_surface);
-
     if (jview) {
+        //TODO: probably get drawing area size
+        GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(gtk_widget));
+
+        int w, h;
+        w = gdk_surface_get_width(surface);
+        h = gdk_surface_get_height(surface);
+
         mainEnv->CallVoidMethod(jview,
                                 jViewNotifyRepaint,
                                 0, 0, w, h);
@@ -869,7 +864,8 @@ void WindowContext::set_visible(bool visible) {
 }
 
 void WindowContext::set_cursor(GdkCursor *cursor) {
-    gdk_surface_set_cursor(gdk_surface, cursor);
+    GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(gtk_widget));
+    gdk_surface_set_cursor(surface, cursor);
 }
 
 void WindowContext::set_level(int level) {

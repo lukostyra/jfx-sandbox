@@ -135,10 +135,8 @@ private:
 
     WindowGeometry geometry;
     std::set<WindowContext *> children;
-//    GdkWMFunction gdk_windowManagerFunctions;
     cairo_surface_t *cairo_surface;
     GtkWidget *gtk_widget;
-    GdkSurface *gdk_surface;
     GtkWidget *drawing_area;
     BgColor bg_color;
 
