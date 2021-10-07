@@ -148,6 +148,7 @@ static jobject createJavaScreen(JNIEnv* env, GdkDisplay* display, GdkMonitor *mo
 
 //    GdkVisual* visual = gdk_screen_get_system_visual(screen);
 
+//TODO maybe: gdk_toplevel_size_get_bounds
 //    GdkRectangle working_monitor_geometry;
 //    gdk_rectangle_intersect(&workArea, &monitor_geometry, &working_monitor_geometry);
 

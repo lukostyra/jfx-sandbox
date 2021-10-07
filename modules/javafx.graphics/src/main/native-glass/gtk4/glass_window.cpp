@@ -81,6 +81,12 @@ static void map_cb(GtkWidget* self, gpointer data) {
     ctx->process_map();
 }
 
+//static void state_flags_cb(GtkWidget* self, GtkStateFlags flags, gpointer data) {
+//    g_print("state_flags_cb\n");
+//    WindowContext *ctx = (WindowContext *)data;
+//    ctx->process_state()
+//}
+
 static void process_events_cb(GdkEvent* event, gpointer data) {
     WindowContext *ctx = (WindowContext *)data;
 
@@ -165,6 +171,7 @@ static void process_events_cb(GdkEvent* event, gpointer data) {
                 break;
         }
     } catch (jni_exception&) {
+        g_print("Exception\n");
     }
 }
 
@@ -175,6 +182,7 @@ static void realize_cb(GtkWidget* self, gpointer data) {
 
         g_signal_connect(surface, "event", G_CALLBACK(process_events_cb), data);
 
+        g_print("Realized: notify_repaint\n");
         WindowContext *ctx = (WindowContext *)data;
         ctx->notify_repaint();
     }
@@ -187,7 +195,6 @@ static void draw_cb(GtkDrawingArea *drawing_area,
                     gpointer        data) {
 
     g_print("draw_cb\n");
-
     cairo_surface_t *surface = ((WindowContext *)data)->get_cairo_surface();
 
     if (surface) {
@@ -222,41 +229,33 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext *_owner, long _scre
 
     g_print("New WindowContext\n");
 
-    //the actual widget is a drawing area
-    gtk_widget = gtk_window_new();
-
-    g_signal_connect(gtk_widget, "realize", G_CALLBACK(realize_cb), this);
-    g_signal_connect(gtk_widget, "map", G_CALLBACK(map_cb), this);
-
-    g_print("Phase 1...\n");
-    drawing_area = gtk_drawing_area_new();
-    gtk_widget_set_halign(drawing_area, GTK_ALIGN_FILL);
-    gtk_widget_set_valign(drawing_area, GTK_ALIGN_FILL);
-    gtk_window_set_child(GTK_WINDOW(gtk_widget), drawing_area);
-    gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_cb, this, NULL);
-
-    g_print("Phase 2...\n");
 
     if (type == POPUP) {
-//        gtk_window_set_skip_taskbar_hint(GTK_WINDOW(gtk_widget), TRUE);
-//        gtk_window_set_skip_pager_hint(GTK_WINDOW(gtk_widget), TRUE);
-        gtk_window_set_decorated(GTK_WINDOW(gtk_widget), FALSE);
-
-        //TODO: need more properties
-        /* Other options:
-            gtk_popover_new()
-            gdk_surface_new_popup()
-        */
+        gtk_widget = gtk_popover_new();
+        gtk_popover_set_autohide(GTK_POPOVER(gtk_widget), TRUE);
+        gtk_popover_set_has_arrow(GTK_POPOVER(gtk_widget), FALSE);
     } else {
-//        GdkToplevelLayout* layout = gdk_toplevel_layout_new();
-        //gdk_toplevel_layout_set_resizable
-        //gdk_toplevel_layout_set_maximized
-        //gdk_toplevel_layout_set_fullscreen
+        //the actual widget is a drawing area
+        gtk_widget = gtk_window_new();
+
+        g_print("Phase 1...\n");
+        drawing_area = gtk_drawing_area_new();
+        gtk_widget_set_halign(drawing_area, GTK_ALIGN_FILL);
+        gtk_widget_set_valign(drawing_area, GTK_ALIGN_FILL);
+        gtk_window_set_child(GTK_WINDOW(gtk_widget), drawing_area);
+        gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_cb, this, NULL);
+
+        g_print("Phase 2...\n");
 
         if (frame_type != TITLED) {
             gtk_window_set_decorated(GTK_WINDOW(gtk_widget), FALSE);
         }
     }
+
+    g_signal_connect(gtk_widget, "realize", G_CALLBACK(realize_cb), this);
+//    g_signal_connect(gtk_widget, "state-flags-changed", G_CALLBACK(state_flags_cb), this);
+    g_signal_connect(gtk_widget, "map", G_CALLBACK(map_cb), this);
+
 
     // This allows to group Windows (based on WM_CLASS). Use the fully qualified
     // JavaFX Application class as StartupWMClass on the .desktop launcher
@@ -288,7 +287,7 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext *_owner, long _scre
 }
 
 void WindowContext::paint(void *data, jint width, jint height) {
-    g_print("Paint\n");
+    g_print("==> Paint\n");
     if (cairo_surface) {
         cairo_surface_destroy(cairo_surface);
     }
@@ -404,20 +403,11 @@ void WindowContext::process_destroy() {
 
 void WindowContext::process_delete() {
     if (jwindow && isEnabled()) {
-//TODO
-//        gtk_widget_hide_on_delete(gtk_widget);
+        gtk_window_set_hide_on_close(GTK_WINDOW(gtk_widget), TRUE);
         mainEnv->CallVoidMethod(jwindow, jWindowNotifyClose);
         CHECK_JNI_EXCEPTION(mainEnv)
     }
 }
-
-//void WindowContext::process_expose(GdkEventExpose *event) {
-//    if (jview && is_visible()) {
-//        mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->area.x, event->area.y,
-//                                event->area.width, event->area.height);
-//        CHECK_JNI_EXCEPTION(mainEnv)
-//    }
-//}
 
 void WindowContext::process_mouse_button(GdkEvent *event) {
     // there are other events like GDK_2BUTTON_PRESS
@@ -756,17 +746,10 @@ void WindowContext::notify_on_top(bool top) {
 
 void WindowContext::notify_repaint() {
     if (jview) {
-        //TODO: probably get drawing area size
-        if (GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(gtk_widget))) {
-            int w, h;
-            w = gdk_surface_get_width(surface);
-            h = gdk_surface_get_height(surface);
-
-            mainEnv->CallVoidMethod(jview,
-                                    jViewNotifyRepaint,
-                                    0, 0, w, h);
-            CHECK_JNI_EXCEPTION(mainEnv);
-        }
+        mainEnv->CallVoidMethod(jview,
+                                jViewNotifyRepaint,
+                                0, 0, gtk_widget_get_width(drawing_area), gtk_widget_get_height(drawing_area));
+        CHECK_JNI_EXCEPTION(mainEnv);
     }
 }
 
@@ -832,10 +815,10 @@ void WindowContext::set_visible(bool visible) {
     }
 
     //JDK-8220272 - fire event first because GDK_FOCUS_CHANGE is not always in order
-//    if (visible && jwindow && isEnabled()) {
-//        mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus, com_sun_glass_events_WindowEvent_FOCUS_GAINED);
-//        CHECK_JNI_EXCEPTION(mainEnv);
-//    }
+    if (visible && jwindow && isEnabled()) {
+        mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus, com_sun_glass_events_WindowEvent_FOCUS_GAINED);
+        CHECK_JNI_EXCEPTION(mainEnv);
+    }
 }
 
 void WindowContext::set_cursor(GdkCursor *cursor) {
@@ -868,22 +851,11 @@ void WindowContext::set_background(float r, float g, float b) {
 
 void WindowContext::set_minimized(bool minimize) {
     is_iconified = minimize;
+
     if (minimize) {
-//        if (frame_type == TRANSPARENT) {
-//            // https://bugs.launchpad.net/ubuntu/+source/unity/+bug/1245571
-//            glass_window_reset_input_shape_mask(gtk_widget_get_window(gtk_widget));
-//        }
-
-//        if ((gdk_windowManagerFunctions & GDK_FUNC_MINIMIZE) == 0) {
-//            // in this case - the window manager will not support the programatic
-//            // request to iconify - so we need to disable this until we are restored.
-//            GdkWMFunction wmf = (GdkWMFunction)(gdk_windowManagerFunctions | GDK_FUNC_MINIMIZE);
-//            gdk_window_set_functions(gdk_window, wmf);
-//        }
-
-//        gdk_toplevel_minimize(GDK_TOPLEVEL(gtk_window));
+        gtk_window_minimize(GTK_WINDOW(gtk_widget));
     } else {
-//        gtk_window_present(GTK_WINDOW(gtk_window));
+        gtk_window_unminimize(GTK_WINDOW(gtk_widget));
     }
 }
 
@@ -901,11 +873,6 @@ void WindowContext::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h,
     g_print("set_bounds: %d, %d, %d, %d, %d, %d\n", x, y, w, h, cw, ch);
     int newW, newH;
 
-    bounds.current_w = w;
-    bounds.current_h = h;
-    bounds.current_cw = cw;
-    bounds.current_ch = ch;
-
     gboolean size_changed = FALSE;
     gboolean pos_changed = FALSE;
 
@@ -917,10 +884,29 @@ void WindowContext::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h,
             gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(drawing_area), ch);
         }
 
+        GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(gtk_widget));
+
         if (w > -1) {
             g_print("gtk_window_set_default_size: %d, %d\n", w, h);
-            gtk_window_set_default_size(GTK_WINDOW(gtk_widget), w, h);
+
+            if (surface) {
+                gtk_window_set_default_size(GTK_WINDOW(gtk_widget), w, h);
+            } else {
+//                gdk_toplevel_size_set_size(GDK_TOPLEVEL(surface), w, h);
+            }
         }
+
+        //TODO: connect to compute-size signal
+        //if realized
+        if (surface) {
+            bounds.current_w = gdk_surface_get_width(surface);
+            bounds.current_h = gdk_surface_get_height(surface);
+        } else {
+            gtk_window_get_default_size(GTK_WINDOW(gtk_widget), &bounds.current_w, &bounds.current_h);
+        }
+
+        bounds.current_cw = gtk_drawing_area_get_content_width(GTK_DRAWING_AREA(drawing_area));
+        bounds.current_ch = gtk_drawing_area_get_content_width(GTK_DRAWING_AREA(drawing_area));
     }
 
 //    if (xSet || ySet) {
@@ -966,7 +952,7 @@ void WindowContext::set_enabled(bool enabled) {
 }
 
 void WindowContext::set_minimum_size(int w, int h) {
-
+    //gdk_toplevel_size_set_min_size
 }
 
 void WindowContext::set_maximum_size(int w, int h) {
