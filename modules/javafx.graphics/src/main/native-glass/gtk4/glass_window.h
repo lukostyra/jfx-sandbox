@@ -116,13 +116,14 @@ private:
         bool enabled;
     } xim;
 
+    //TODO: remove
     size_t events_processing_cnt;
 
     WindowBounds bounds;
     std::set<WindowContext *> children;
-    cairo_surface_t *cairo_surface;
+//    cairo_surface_t *cairo_surface;
     GtkWidget *gtk_widget;
-    GtkWidget *drawing_area;
+//    GtkWidget *drawing_area;
     BgColor bg_color;
 
     static WindowContext* sm_mouse_drag_window;
@@ -139,7 +140,7 @@ public:
     bool isEnabled();
 
     GdkSurface *get_gdk_surface();
-    cairo_surface_t *get_cairo_surface();
+//    cairo_surface_t *get_cairo_surface();
     GtkWidget *get_gtk_widget();
     GtkWindow *get_gtk_window();
     WindowBounds get_bounds();

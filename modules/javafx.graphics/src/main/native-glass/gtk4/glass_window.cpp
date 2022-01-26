@@ -87,7 +87,7 @@ static void map_cb(GtkWidget* self, gpointer data) {
 //    ctx->process_state()
 //}
 
-static void process_events_cb(GdkEvent* event, gpointer data) {
+static gboolean process_events_cb(GdkSurface* self, GdkEvent* event, gpointer data) {
     WindowContext *ctx = (WindowContext *)data;
 
 //TODO window disabled
@@ -102,9 +102,9 @@ static void process_events_cb(GdkEvent* event, gpointer data) {
 
 //    glass_evloop_call_hooks(event);
 
-    guint type = gdk_event_get_event_type(GDK_EVENT(event));
+    guint type = gdk_event_get_event_type(event);
 
-    g_print("Event: %d\n", type);
+    g_print("xxxx Event: %d\n", type);
 
     EventsCounterHelper helper(ctx);
     try {
@@ -173,6 +173,8 @@ static void process_events_cb(GdkEvent* event, gpointer data) {
     } catch (jni_exception&) {
         g_print("Exception\n");
     }
+
+    return TRUE;
 }
 
 static void realize_cb(GtkWidget* self, gpointer data) {
@@ -182,28 +184,29 @@ static void realize_cb(GtkWidget* self, gpointer data) {
 
         g_signal_connect(surface, "event", G_CALLBACK(process_events_cb), data);
 
-        g_print("Realized: notify_repaint\n");
-        WindowContext *ctx = (WindowContext *)data;
-        ctx->notify_repaint();
+//        g_print("Realized: notify_repaint\n");
+//        WindowContext *ctx = (WindowContext *)data;
+//        ctx->notify_repaint();
     }
 }
 
-static void draw_cb(GtkDrawingArea *drawing_area,
-                    cairo_t        *cr,
-                    int             width,
-                    int             height,
-                    gpointer        data) {
-
-    g_print("draw_cb\n");
-    cairo_surface_t *surface = ((WindowContext *)data)->get_cairo_surface();
-
-    if (surface) {
-        cairo_set_source_surface(cr, surface, 0, 0);
-        cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
-        cairo_paint(cr);
-        cairo_surface_destroy(surface);
-    }
-}
+//static void draw_cb(GtkDrawingArea  *drawing_area,
+//                    cairo_t         *cr,
+//                    int             width,
+//                    int             height,
+//                    gpointer        data) {
+//
+//    g_print("draw_cb\n");
+//    cairo_surface_t *surface = ((WindowContext *)data)->get_cairo_surface();
+//
+//    if (surface) {
+//        g_print("surface_exists\n");
+//        cairo_set_source_surface(cr, surface, 0, 0);
+//        cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+//        cairo_paint(cr);
+//        cairo_surface_destroy(surface);
+//    }
+//}
 
 ////////////////////////////// WindowContext /////////////////////////////////
 
@@ -229,7 +232,6 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext *_owner, long _scre
 
     g_print("New WindowContext\n");
 
-
     if (type == POPUP) {
         gtk_widget = gtk_popover_new();
         gtk_popover_set_autohide(GTK_POPOVER(gtk_widget), TRUE);
@@ -238,19 +240,16 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext *_owner, long _scre
         //the actual widget is a drawing area
         gtk_widget = gtk_window_new();
 
-        g_print("Phase 1...\n");
-        drawing_area = gtk_drawing_area_new();
-        gtk_widget_set_halign(drawing_area, GTK_ALIGN_FILL);
-        gtk_widget_set_valign(drawing_area, GTK_ALIGN_FILL);
-        gtk_window_set_child(GTK_WINDOW(gtk_widget), drawing_area);
-        gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_cb, this, NULL);
-
-        g_print("Phase 2...\n");
-
         if (frame_type != TITLED) {
             gtk_window_set_decorated(GTK_WINDOW(gtk_widget), FALSE);
         }
     }
+
+//    drawing_area = gtk_drawing_area_new();
+//    gtk_widget_set_halign(drawing_area, GTK_ALIGN_FILL);
+//    gtk_widget_set_valign(drawing_area, GTK_ALIGN_FILL);
+//    gtk_window_set_child(GTK_WINDOW(gtk_widget), drawing_area);
+//    gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(drawing_area), draw_cb, this, NULL);
 
     g_signal_connect(gtk_widget, "realize", G_CALLBACK(realize_cb), this);
 //    g_signal_connect(gtk_widget, "state-flags-changed", G_CALLBACK(state_flags_cb), this);
@@ -288,16 +287,16 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext *_owner, long _scre
 
 void WindowContext::paint(void *data, jint width, jint height) {
     g_print("==> Paint\n");
-    if (cairo_surface) {
-        cairo_surface_destroy(cairo_surface);
-    }
-
-    cairo_surface = cairo_image_surface_create_for_data(
-            (unsigned char *) data,
-            CAIRO_FORMAT_ARGB32,
-            width, height, width * 4);
-
-    gtk_widget_queue_draw(drawing_area);
+//    if (cairo_surface) {
+//        cairo_surface_destroy(cairo_surface);
+//    }
+//
+//    cairo_surface = cairo_image_surface_create_for_data(
+//            (unsigned char *) data,
+//            CAIRO_FORMAT_ARGB32,
+//            width, height, width * 4);
+//
+//    gtk_widget_queue_draw(drawing_area);
 }
 
 bool WindowContext::isEnabled() {
@@ -746,6 +745,8 @@ void WindowContext::notify_on_top(bool top) {
 
 void WindowContext::notify_repaint() {
     if (jview) {
+
+
         mainEnv->CallVoidMethod(jview,
                                 jViewNotifyRepaint,
                                 0, 0, gtk_widget_get_width(drawing_area), gtk_widget_get_height(drawing_area));
@@ -880,8 +881,8 @@ void WindowContext::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h,
         size_changed = TRUE;
 
         if (cw > -1) {
-            gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(drawing_area), cw);
-            gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(drawing_area), ch);
+//            gtk_drawing_area_set_content_width(GTK_DRAWING_AREA(drawing_area), cw);
+//            gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(drawing_area), ch);
         }
 
         GdkSurface *surface = gtk_native_get_surface(GTK_NATIVE(gtk_widget));
@@ -905,8 +906,8 @@ void WindowContext::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h,
             gtk_window_get_default_size(GTK_WINDOW(gtk_widget), &bounds.current_w, &bounds.current_h);
         }
 
-        bounds.current_cw = gtk_drawing_area_get_content_width(GTK_DRAWING_AREA(drawing_area));
-        bounds.current_ch = gtk_drawing_area_get_content_width(GTK_DRAWING_AREA(drawing_area));
+//        bounds.current_cw = gtk_drawing_area_get_content_width(GTK_DRAWING_AREA(drawing_area));
+//        bounds.current_ch = gtk_drawing_area_get_content_width(GTK_DRAWING_AREA(drawing_area));
     }
 
 //    if (xSet || ySet) {
