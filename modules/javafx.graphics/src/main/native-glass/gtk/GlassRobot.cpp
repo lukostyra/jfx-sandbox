@@ -41,35 +41,54 @@
 #define MOUSE_BACK_BTN 8
 #define MOUSE_FORWARD_BTN 9
 
+static Display* getXDisplay() {
+     return GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+}
+
+static void getXPointerPos(int *x, int *y) {
+    Display *xdisplay = getXDisplay();
+
+    Window child_win, root_win;
+    int win_x, win_y;
+    guint mask = 0;
+
+    XQueryPointer(xdisplay, XRootWindow(xdisplay, DefaultScreen(xdisplay)),
+                  &child_win, &root_win, x, y, &win_x, &win_y, &mask);
+}
+
 static void checkXTest(JNIEnv* env) {
     int32_t major_opcode, first_event, first_error;
     int32_t  event_basep, error_basep, majorp, minorp;
     static int32_t isXTestAvailable;
     static gboolean checkDone = FALSE;
     if (!checkDone) {
+        Display *xdisplay = getXDisplay();
+
         /* check if XTest is available */
-        isXTestAvailable = XQueryExtension(gdk_x11_get_default_xdisplay(), XTestExtensionName, &major_opcode, &first_event, &first_error);
+        isXTestAvailable = XQueryExtension(xdisplay, XTestExtensionName, &major_opcode, &first_event, &first_error);
         if (isXTestAvailable) {
             /* check if XTest version is OK */
-            XTestQueryExtension(gdk_x11_get_default_xdisplay(), &event_basep, &error_basep, &majorp, &minorp);
+            XTestQueryExtension(xdisplay, &event_basep, &error_basep, &majorp, &minorp);
             if (majorp < 2 || (majorp == 2 && minorp < 2)) {
                     isXTestAvailable = False;
             } else {
-                XTestGrabControl(gdk_x11_get_default_xdisplay(), True);
+                XTestGrabControl(xdisplay, True);
             }
         }
         checkDone = TRUE;
     }
     if (!isXTestAvailable) {
         jclass cls = env->FindClass("java/lang/UnsupportedOperationException");
-        if (env->ExceptionCheck()) return;
+        if (env->ExceptionCheck()) {
+            return;
+        }
         env->ThrowNew(cls, "Glass Robot needs XTest extension to work");
     }
 }
 
-static void keyButton(jint code, gboolean press)
-{
-    Display *xdisplay = gdk_x11_get_default_xdisplay();
+static void keyButton(jint code, gboolean press) {
+    Display *xdisplay = getXDisplay();
+
     gint gdk_keyval = find_gdk_keyval_for_glass_keycode(code);
     GdkKeymapKey *keys;
     gint n_keys;
@@ -130,21 +149,23 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mouseMove
 {
     (void)obj;
 
-    Display *xdisplay = gdk_x11_get_default_xdisplay();
+    Display *xdisplay = getXDisplay();
+
     checkXTest(env);
     jfloat uiScale = getUIScale(gdk_screen_get_default());
     x = rint(x * uiScale);
     y = rint(y * uiScale);
-    XWarpPointer(xdisplay,
-            None,
-            XRootWindow(xdisplay,gdk_x11_get_default_screen()),
-            0, 0, 0, 0, x, y);
+    XWarpPointer(xdisplay, None,
+                XRootWindow(xdisplay, DefaultScreen(xdisplay)),
+                0, 0, 0, 0, x, y);
+
     XSync(xdisplay, False);
 }
 
 static void mouseButtons(jint buttons, gboolean press)
 {
-    Display *xdisplay = gdk_x11_get_default_xdisplay();
+    Display *xdisplay = getXDisplay();
+
     if (buttons & com_sun_glass_ui_GlassRobot_MOUSE_LEFT_BTN) {
         XTestFakeButtonEvent(xdisplay, 1, press, CurrentTime);
     }
@@ -202,7 +223,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mouseWheel
 {
     (void)obj;
 
-    Display *xdisplay = gdk_x11_get_default_xdisplay();
+    Display *xdisplay = getXDisplay();
     int repeat = abs(amt);
     int button = amt < 0 ? 4 : 5;
     int i;
@@ -226,8 +247,8 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1getMouseX
     (void)env;
     (void)obj;
 
-    jint x;
-    glass_gdk_display_get_pointer(gdk_display_get_default(), &x, NULL);
+    jint x, y;
+    getXPointerPos(&x, &y);
     x = rint(x / getUIScale(gdk_screen_get_default()));
     return x;
 }
@@ -243,8 +264,8 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1getMouseY
     (void)env;
     (void)obj;
 
-    jint y;
-    glass_gdk_display_get_pointer(gdk_display_get_default(), NULL, &y);
+    jint x, y;
+    getXPointerPos(&x, &y);
     y = rint(y / getUIScale(gdk_screen_get_default()));
     return y;
 }

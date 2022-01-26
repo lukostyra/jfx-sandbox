@@ -74,6 +74,82 @@ static gboolean call_runnable (gpointer data)
 
 extern "C" {
 
+static gboolean process_event_source(gpointer data)
+static gboolean x11_event_source_prepare(GSource* source, gint* timeout);
+static gboolean x11_event_source_check(GSource* source);
+static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback, gpointer user_data);
+static void x11_event_source_finalize(GSource* source);
+
+static GSourceFuncs event_funcs = {
+  x11_event_source_prepare,
+  x11_event_source_check,
+  x11_event_source_dispatch,
+  x11_event_source_finalize
+};
+
+static GSource * x11_event_source_new(Display* display) {
+  GSource *source;
+  GdkEventSource *event_source;
+  int connection_number;
+  char *name;
+
+  source = g_source_new (&event_funcs, sizeof (GdkEventSource));
+  event_source = (GdkEventSource *) source;
+  event_source->display = display;
+
+  connection_number = ConnectionNumber(display);
+
+  event_source->event_poll_fd.fd = connection_number;
+  event_source->event_poll_fd.events = G_IO_IN;
+  g_source_add_poll (source, &event_source->event_poll_fd);
+
+  g_source_set_priority (source, GDK_PRIORITY_EVENTS);
+  g_source_set_can_recurse (source, TRUE);
+  g_source_attach (source, NULL);
+
+  return source;
+}
+
+static gboolean x11_event_source_prepare(GSource* source, gint* timeout) {
+    return TRUE;
+}
+
+static gboolean x11_event_source_check(GSource* source) {
+    return TRUE;
+}
+
+static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback, gpointer user_data) {
+    g_idle_add_full(G_PRIORITY_HIGH_IDLE + 30, process_event_source, source, NULL);
+}
+
+static void x11_event_source_finalize(GSource* source) {
+
+}
+
+static void process_event_source(gpointer data) {
+    GSource *source;
+    XEvent xevent;
+
+    source = (GSource *) data;
+    Display *display = ((GdkEventSource*) source)->display;
+
+    while (XPending(display)) {
+        XNextEvent(display, &xevent);
+
+        switch (xevent.type) {
+            case Expose:
+                break;
+            case KeyPress:
+            case KeyRelease:
+                break;
+        }
+
+        //FIXME: temporary until all ported
+        GdkEvent* event = gdk_event_source_translate_event(source, &xevent);
+        process_events(event, NULL);
+    }
+}
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 static void init_threads() {
@@ -157,11 +233,11 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
     (void)obj;
 
     mainEnv = env;
-    process_events_prev = (GdkEventFunc) handler;
+//    process_events_prev = (GdkEventFunc) handler;
     disableGrab = (gboolean) _disableGrab;
 
     glass_gdk_x11_display_set_window_scale(gdk_display_get_default(), 1);
-    gdk_event_handler_set(process_events, NULL, NULL);
+//    gdk_event_handler_set(process_events, NULL, NULL);
 
     GdkScreen *default_gdk_screen = gdk_screen_get_default();
     if (default_gdk_screen != NULL) {
@@ -173,6 +249,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
 
     GdkWindow *root = gdk_screen_get_root_window(default_gdk_screen);
     gdk_window_set_events(root, static_cast<GdkEventMask>(gdk_window_get_events(root) | GDK_PROPERTY_CHANGE_MASK));
+
+
 }
 
 /*
@@ -250,7 +328,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1submitForLater
 
     RunnableContext* context = (RunnableContext*)malloc(sizeof(RunnableContext));
     context->runnable = env->NewGlobalRef(runnable);
-    gdk_threads_add_idle_full(G_PRIORITY_HIGH_IDLE + 30, call_runnable, context, NULL);
+    g_idle_add_full(G_PRIORITY_HIGH_IDLE + 30, call_runnable, context, NULL);
 }
 
 /*
