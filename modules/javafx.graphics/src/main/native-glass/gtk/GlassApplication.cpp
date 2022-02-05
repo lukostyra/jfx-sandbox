@@ -126,7 +126,6 @@ static gboolean x11_event_source_check(GSource* source) {
 static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback, gpointer data) {
     XEvent xevent;
 
-    source = (GSource *) data;
     Display *display = ((X11Source*) source)->display;
 
     while (XPending(display)) {
