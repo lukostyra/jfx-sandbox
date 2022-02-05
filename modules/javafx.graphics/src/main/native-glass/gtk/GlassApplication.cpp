@@ -22,8 +22,9 @@
  * or visit www.oracle.com if you need additional information or have any
  * questions.
  */
-#include <X11/Xlib.h>
-#include <X11/Xatom.h>
+
+//#include <X11/Xlib.h>
+//#include <X11/Xatom.h>
 #include <gdk/gdk.h>
 #include <gdk/gdkx.h>
 #include <gtk/gtk.h>
@@ -74,43 +75,47 @@ static gboolean call_runnable (gpointer data)
 
 extern "C" {
 
-static gboolean process_event_source(gpointer data)
 static gboolean x11_event_source_prepare(GSource* source, gint* timeout);
 static gboolean x11_event_source_check(GSource* source);
 static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback, gpointer user_data);
-static void x11_event_source_finalize(GSource* source);
 
-static GSourceFuncs event_funcs = {
-  x11_event_source_prepare,
-  x11_event_source_check,
-  x11_event_source_dispatch,
-  x11_event_source_finalize
+typedef struct x11_source {
+  GSource source;
+  Display *display;
+} X11Source;
+
+static GSourceFuncs x11_event_funcs = {
+    x11_event_source_prepare,
+    x11_event_source_check,
+    x11_event_source_dispatch,
+    NULL,
+    NULL,
+    NULL
 };
 
-static GSource * x11_event_source_new(Display* display) {
-  GSource *source;
-  GdkEventSource *event_source;
-  int connection_number;
-  char *name;
+static void x11_monitor_events(Display* display) {
+    GSource *source;
 
-  source = g_source_new (&event_funcs, sizeof (GdkEventSource));
-  event_source = (GdkEventSource *) source;
-  event_source->display = display;
+    source = g_source_new (&x11_event_funcs, sizeof(X11Source));
+    ((X11Source*)source)->display = display;
 
-  connection_number = ConnectionNumber(display);
+    GPollFD dpy_pollfd = {
+        XConnectionNumber(display),
+        G_IO_IN | G_IO_HUP | G_IO_ERR,
+        0
+    };
 
-  event_source->event_poll_fd.fd = connection_number;
-  event_source->event_poll_fd.events = G_IO_IN;
-  g_source_add_poll (source, &event_source->event_poll_fd);
+    g_source_add_poll(source, &dpy_pollfd);
 
-  g_source_set_priority (source, GDK_PRIORITY_EVENTS);
-  g_source_set_can_recurse (source, TRUE);
-  g_source_attach (source, NULL);
+    g_source_set_priority(source, G_PRIORITY_HIGH_IDLE + 50);
+    g_source_set_can_recurse(source, TRUE);
+    g_source_attach(source, NULL);
 
-  return source;
+//    return source;
 }
 
 static gboolean x11_event_source_prepare(GSource* source, gint* timeout) {
+    *timeout = -1;
     return TRUE;
 }
 
@@ -118,36 +123,31 @@ static gboolean x11_event_source_check(GSource* source) {
     return TRUE;
 }
 
-static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback, gpointer user_data) {
-    g_idle_add_full(G_PRIORITY_HIGH_IDLE + 30, process_event_source, source, NULL);
-}
-
-static void x11_event_source_finalize(GSource* source) {
-
-}
-
-static void process_event_source(gpointer data) {
-    GSource *source;
+static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback, gpointer data) {
     XEvent xevent;
 
     source = (GSource *) data;
-    Display *display = ((GdkEventSource*) source)->display;
+    Display *display = ((X11Source*) source)->display;
 
     while (XPending(display)) {
         XNextEvent(display, &xevent);
 
         switch (xevent.type) {
             case Expose:
+                g_print("X11 Expose\n");
                 break;
             case KeyPress:
             case KeyRelease:
+                g_print("X11 Key\n");
                 break;
         }
 
-        //FIXME: temporary until all ported
-        GdkEvent* event = gdk_event_source_translate_event(source, &xevent);
-        process_events(event, NULL);
+        //TODO: Remove
+//        GdkEvent* event = gdk_event_source_translate_event(source, &xevent);
+//        process_events(event, NULL);
     }
+
+    return TRUE;
 }
 
 #pragma GCC diagnostic push
@@ -247,10 +247,11 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
                          G_CALLBACK(screen_settings_changed), NULL);
     }
 
-    GdkWindow *root = gdk_screen_get_root_window(default_gdk_screen);
-    gdk_window_set_events(root, static_cast<GdkEventMask>(gdk_window_get_events(root) | GDK_PROPERTY_CHANGE_MASK));
-
-
+    //TODO: remove
+//    GdkWindow *root = gdk_screen_get_root_window(default_gdk_screen);
+//    gdk_window_set_events(root, static_cast<GdkEventMask>(gdk_window_get_events(root) | GDK_PROPERTY_CHANGE_MASK));
+    Display* display = gdk_x11_display_get_xdisplay(gdk_display_get_default());
+    x11_monitor_events(display);
 }
 
 /*
@@ -469,8 +470,6 @@ JNIEXPORT jboolean JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1supportsTr
 } // extern "C"
 
 bool is_window_enabled_for_event(GdkWindow * window, WindowContext *ctx, gint event_type) {
-
-
     if (gdk_window_is_destroyed(window)) {
         return FALSE;
     }
@@ -496,6 +495,7 @@ bool is_window_enabled_for_event(GdkWindow * window, WindowContext *ctx, gint ev
     return TRUE;
 }
 
+//TODO: remove
 static void process_events(GdkEvent* event, gpointer data)
 {
     GdkWindow* window = event->any.window;
