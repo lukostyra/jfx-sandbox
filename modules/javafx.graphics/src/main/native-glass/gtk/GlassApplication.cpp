@@ -80,8 +80,8 @@ static gboolean x11_event_source_check(GSource* source);
 static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback, gpointer user_data);
 
 typedef struct x11_source {
-  GSource source;
-  Display *display;
+    GSource source;
+    Display *display;
 } X11Source;
 
 static GSourceFuncs x11_event_funcs = {
@@ -110,7 +110,6 @@ static void x11_monitor_events(Display* display) {
     g_source_set_priority(source, G_PRIORITY_HIGH_IDLE + 50);
     g_source_set_can_recurse(source, TRUE);
     g_source_attach(source, NULL);
-
 //    return source;
 }
 
@@ -131,6 +130,8 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
     while (XPending(display)) {
         XNextEvent(display, &xevent);
 
+        g_print("Event %d\n", xevent.type);
+
         switch (xevent.type) {
             case Expose:
                 g_print("X11 Expose\n");
@@ -138,6 +139,15 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             case KeyPress:
             case KeyRelease:
                 g_print("X11 Key\n");
+                break;
+            case ButtonPress:
+                g_print("X11 Button Press\n");
+                break;
+            case ButtonRelease:
+                g_print("X11 Button Release\n");
+                break;
+            case MotionNotify:
+                g_print("Pointer motion\n");
                 break;
         }
 
@@ -495,6 +505,7 @@ bool is_window_enabled_for_event(GdkWindow * window, WindowContext *ctx, gint ev
 }
 
 //TODO: remove
+/*
 static void process_events(GdkEvent* event, gpointer data)
 {
     GdkWindow* window = event->any.window;
@@ -602,3 +613,4 @@ static void process_events(GdkEvent* event, gpointer data)
         }
     }
 }
+*/

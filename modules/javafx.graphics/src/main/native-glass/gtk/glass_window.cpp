@@ -35,6 +35,7 @@
 
 #include <com_sun_glass_ui_Window_Level.h>
 
+#include <X11/Xresource.h>
 #include <X11/extensions/shape.h>
 #include <cairo.h>
 #include <cairo-xlib.h>
@@ -518,31 +519,38 @@ void WindowContextBase::paint(void* data, jint width, jint height)
     if (!is_visible()) {
         return;
     }
-#ifdef GLASS_GTK3
-    cairo_region_t *region = gdk_window_get_clip_region(gdk_window);
-    gdk_window_begin_paint_region(gdk_window, region);
-#endif
-    cairo_t* context;
-    context = gdk_cairo_create(gdk_window);
 
-    cairo_surface_t* cairo_surface;
-    cairo_surface = cairo_image_surface_create_for_data(
-            (unsigned char*)data,
-            CAIRO_FORMAT_ARGB32,
-            width, height, width * 4);
+//    Pixmap pix = XCreatePixmap(display, xwindow, width, height, 4);
+//    XImage *XCreateImage(Display *display, Visual *visual, unsigned int depth, int format, int offset, char *data, unsigned int width, unsigned int height, int bitmap_pad, int bytes_per_line);
+//    XCopyArea(display, Drawable src, Drawable dest, GC gc, int src_x, int src_y, unsigned int width, unsigned int height, int dest_x, int dest_y);
+//    XFreePixmap(display, pix);
+//    XDrawImageString(display, width, height, (char *)data, strlen(data));
 
-    applyShapeMask(data, width, height);
-
-    cairo_set_source_surface(context, cairo_surface, 0, 0);
-    cairo_set_operator (context, CAIRO_OPERATOR_SOURCE);
-    cairo_paint(context);
-#ifdef GLASS_GTK3
-    gdk_window_end_paint(gdk_window);
-    cairo_region_destroy(region);
-#endif
-
-    cairo_destroy(context);
-    cairo_surface_destroy(cairo_surface);
+//#ifdef GLASS_GTK3
+//    cairo_region_t *region = gdk_window_get_clip_region(gdk_window);
+//    gdk_window_begin_paint_region(gdk_window, region);
+//#endif
+//    cairo_t* context;
+//    context = gdk_cairo_create(gdk_window);
+//
+//    cairo_surface_t* cairo_surface;
+//    cairo_surface = cairo_image_surface_create_for_data(
+//            (unsigned char*)data,
+//            CAIRO_FORMAT_ARGB32,
+//            width, height, width * 4);
+//
+//    applyShapeMask(data, width, height);
+//
+//    cairo_set_source_surface(context, cairo_surface, 0, 0);
+//    cairo_set_operator (context, CAIRO_OPERATOR_SOURCE);
+//    cairo_paint(context);
+//#ifdef GLASS_GTK3
+//    gdk_window_end_paint(gdk_window);
+//    cairo_region_destroy(region);
+//#endif
+//
+//    cairo_destroy(context);
+//    cairo_surface_destroy(cairo_surface);
 }
 
 void WindowContextBase::add_child(WindowContextTop* child) {
@@ -761,7 +769,40 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     gtk_window_set_title(GTK_WINDOW(gtk_widget), "");
 
     gdk_window = gtk_widget_get_window(gtk_widget);
-    gdk_window_set_events(gdk_window, GDK_FILTERED_EVENTS_MASK);
+
+    xwindow = GDK_WINDOW_XID(gdk_window);
+
+    int mask = KeyPressMask
+               | KeyReleaseMask
+               | ButtonPressMask
+               | ButtonReleaseMask
+               | EnterWindowMask
+               | LeaveWindowMask
+               | PointerMotionMask
+               | PointerMotionHintMask
+               | Button1MotionMask
+               | Button2MotionMask
+               | Button3MotionMask
+               | Button4MotionMask
+               | Button5MotionMask
+               | ButtonMotionMask
+               | KeymapStateMask
+               | ExposureMask
+               | VisibilityChangeMask
+               | StructureNotifyMask
+               | ResizeRedirectMask
+//               |  SubstructureNotifyMask
+//                SubstructureRedirectMask
+               | FocusChangeMask
+               | PropertyChangeMask
+//                ColormapChangeMask
+               | OwnerGrabButtonMask;
+
+//    gdk_window_set_events(gdk_window, GDK_FILTERED_EVENTS_MASK);
+//TODO: keep display
+    display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+    XSelectInput(display, xwindow, mask);
+    XSaveContext(display, xwindow, XUniqueContext(), XPointer(this));
 
     g_object_set_data_full(G_OBJECT(gdk_window), GDK_WINDOW_DATA_CONTEXT, this, NULL);
 

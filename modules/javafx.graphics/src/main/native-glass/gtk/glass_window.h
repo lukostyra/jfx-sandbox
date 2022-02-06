@@ -187,6 +187,9 @@ protected:
     jobject jview;
     GtkWidget* gtk_widget;
     GdkWindow* gdk_window;
+    Window xwindow;
+    Display* display;
+
     GdkWMFunction gdk_windowManagerFunctions;
 
     bool is_iconified;
