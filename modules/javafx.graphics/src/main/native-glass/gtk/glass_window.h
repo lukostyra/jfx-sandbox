@@ -140,6 +140,7 @@ public:
 
     virtual void process_property_notify(GdkEventProperty*) = 0;
     virtual void process_configure(GdkEventConfigure*) = 0;
+    virtual void process_configure(XConfigureEvent*) = 0;
     virtual void process_map() = 0;
     virtual void process_focus(GdkEventFocus*) = 0;
     virtual void process_destroy() = 0;
@@ -307,6 +308,7 @@ public:
     void process_map();
     void process_property_notify(GdkEventProperty*);
     void process_configure(GdkEventConfigure*);
+    void process_configure(XConfigureEvent*);
     void process_destroy();
     void process_net_wm_property();
 

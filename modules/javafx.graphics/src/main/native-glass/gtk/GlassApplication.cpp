@@ -140,6 +140,9 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
         g_print("Event %d\n", xevent.type);
 
         switch (xevent.type) {
+            case ConfigureNotify:
+                ctx->process_configure(&xevent.xconfigure);
+                break;
             case Expose:
                 g_print("X11 Expose\n");
                 ctx->process_expose(&xevent.xexpose);

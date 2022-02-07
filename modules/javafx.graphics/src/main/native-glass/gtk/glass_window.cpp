@@ -592,6 +592,7 @@ void WindowContextBase::reparent_children(WindowContext* parent) {
 
 void WindowContextBase::set_visible(bool visible) {
     if (visible) {
+//        XMapWindow(display, xwindow);
         gtk_widget_show_all(gtk_widget);
     } else {
         gtk_widget_hide(gtk_widget);
@@ -1161,6 +1162,13 @@ void WindowContextTop::process_configure(GdkEventConfigure* event) {
     }
 }
 
+void WindowContextTop::process_configure(XConfigureEvent* event) {
+    g_print("PROCESS_CONFIGURE\n");
+
+//    XResizeWindow(display, xwindow, 400, 400);
+    //XMoveResizeWindow(display, xwindow, 200, 200, 400, 400);
+}
+
 void WindowContextTop::update_window_constraints() {
     if (resizable.value) {
         GdkGeometry geom = {
@@ -1317,7 +1325,8 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges,
         if (windowChangesMask & CWY) {
             newY = windowChanges->y;
         }
-        gtk_window_move(GTK_WINDOW(gtk_widget), newX, newY);
+        XMoveWindow(display, xwindow, newX, newY);
+        //gtk_window_move(GTK_WINDOW(gtk_widget), newX, newY);
     }
 
     if (windowChangesMask & (CWWidth | CWHeight)) {
@@ -1338,7 +1347,8 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges,
             geom.min_height = geom.max_height = newHeight;
             gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom, hints);
         }
-        gtk_window_resize(GTK_WINDOW(gtk_widget), newWidth, newHeight);
+        //gtk_window_resize(GTK_WINDOW(gtk_widget), newWidth, newHeight);
+        XResizeWindow(display, xwindow, newWidth, newHeight);
 
         //JDK-8193502: Moved here from WindowContextBase::set_view because set_view is called
         //first and the size is not set yet. This also guarantees that the size will be correct
