@@ -29,6 +29,7 @@
 
 char const * const GDK_WINDOW_DATA_CONTEXT = "glass_window_context";
 
+int X_CONTEXT = XUniqueContext();
 jclass jStringCls;
 jclass jByteBufferCls;
 jmethodID jByteBufferArray;

@@ -145,6 +145,7 @@ public:
     virtual void process_destroy() = 0;
     virtual void process_delete() = 0;
     virtual void process_expose(GdkEventExpose*) = 0;
+    virtual void process_expose(XExposeEvent *) = 0;
     virtual void process_mouse_button(GdkEventButton*) = 0;
     virtual void process_mouse_motion(GdkEventMotion*) = 0;
     virtual void process_mouse_scroll(GdkEventScroll*) = 0;
@@ -245,6 +246,7 @@ public:
     void process_destroy();
     void process_delete();
     void process_expose(GdkEventExpose*);
+    void process_expose(XExposeEvent *);
     void process_mouse_button(GdkEventButton*);
     void process_mouse_motion(GdkEventMotion*);
     void process_mouse_scroll(GdkEventScroll*);

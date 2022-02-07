@@ -35,7 +35,6 @@
 
 #include <com_sun_glass_ui_Window_Level.h>
 
-#include <X11/Xresource.h>
 #include <X11/extensions/shape.h>
 #include <cairo.h>
 #include <cairo-xlib.h>
@@ -238,6 +237,13 @@ void WindowContextBase::process_delete() {
 void WindowContextBase::process_expose(GdkEventExpose* event) {
     if (jview) {
         mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->area.x, event->area.y, event->area.width, event->area.height);
+        CHECK_JNI_EXCEPTION(mainEnv)
+    }
+}
+
+void WindowContextBase::process_expose(XExposeEvent* event) {
+    if (jview) {
+        mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->x, event->y, event->width, event->height);
         CHECK_JNI_EXCEPTION(mainEnv)
     }
 }
@@ -520,11 +526,15 @@ void WindowContextBase::paint(void* data, jint width, jint height)
         return;
     }
 
-//    Pixmap pix = XCreatePixmap(display, xwindow, width, height, 4);
-//    XImage *XCreateImage(Display *display, Visual *visual, unsigned int depth, int format, int offset, char *data, unsigned int width, unsigned int height, int bitmap_pad, int bytes_per_line);
-//    XCopyArea(display, Drawable src, Drawable dest, GC gc, int src_x, int src_y, unsigned int width, unsigned int height, int dest_x, int dest_y);
-//    XFreePixmap(display, pix);
-//    XDrawImageString(display, width, height, (char *)data, strlen(data));
+    //TODO: save visual
+    XImage* image = XCreateImage(display, DefaultVisual(display, 0), 32, ZPixmap, 0, (char *) data, width, height, 32, 0);
+    Pixmap bitmap = XCreatePixmap(display, xwindow, width, height, 1);
+    GC gc = XCreateGC(display, bitmap, 0, NULL);
+    XPutImage(display, bitmap, gc, image, 0, 0, 0, 0, width, height);
+    XCopyArea(display, bitmap, xwindow, gc, 0, 0, width, height, 0, 0);
+    XFreePixmap(display, bitmap);
+    XFreeGC(display, gc);
+    XFree(image);
 
 //#ifdef GLASS_GTK3
 //    cairo_region_t *region = gdk_window_get_clip_region(gdk_window);
@@ -802,7 +812,8 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 //TODO: keep display
     display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
     XSelectInput(display, xwindow, mask);
-    XSaveContext(display, xwindow, XUniqueContext(), XPointer(this));
+    g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
+    XSaveContext(display, xwindow, X_CONTEXT, XPointer(this));
 
     g_object_set_data_full(G_OBJECT(gdk_window), GDK_WINDOW_DATA_CONTEXT, this, NULL);
 

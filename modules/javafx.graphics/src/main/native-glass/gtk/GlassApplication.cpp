@@ -25,6 +25,7 @@
 
 //#include <X11/Xlib.h>
 //#include <X11/Xatom.h>
+#include <X11/Xresource.h>
 #include <gdk/gdk.h>
 #include <gdk/gdkx.h>
 #include <gtk/gtk.h>
@@ -126,15 +127,22 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
     XEvent xevent;
 
     Display *display = ((X11Source*) source)->display;
+    WindowContext* ctx;
 
     while (XPending(display)) {
         XNextEvent(display, &xevent);
+
+        if (XFindContext(display, xevent.xany.window, X_CONTEXT, (XPointer *) &ctx) != XCSUCCESS) {
+            g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
+            continue;
+        }
 
         g_print("Event %d\n", xevent.type);
 
         switch (xevent.type) {
             case Expose:
                 g_print("X11 Expose\n");
+                ctx->process_expose(&xevent.xexpose);
                 break;
             case KeyPress:
             case KeyRelease:
