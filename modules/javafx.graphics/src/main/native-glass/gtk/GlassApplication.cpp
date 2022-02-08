@@ -132,12 +132,12 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
     while (XPending(display)) {
         XNextEvent(display, &xevent);
 
+        g_print("Event %d\n", xevent.type);
+
         if (XFindContext(display, xevent.xany.window, X_CONTEXT, (XPointer *) &ctx) != XCSUCCESS) {
             g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
             continue;
         }
-
-        g_print("Event %d\n", xevent.type);
 
         switch (xevent.type) {
             case ConfigureNotify:

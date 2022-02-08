@@ -27,6 +27,7 @@
 
 #include <gtk/gtk.h>
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 
 #include <jni.h>
 #include <set>
@@ -191,6 +192,7 @@ protected:
     GdkWindow* gdk_window;
     Window xwindow;
     Display* display;
+    XVisualInfo vinfo;
 
     GdkWMFunction gdk_windowManagerFunctions;
 

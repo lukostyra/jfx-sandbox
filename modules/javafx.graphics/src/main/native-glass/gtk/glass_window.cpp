@@ -243,6 +243,7 @@ void WindowContextBase::process_expose(GdkEventExpose* event) {
 
 void WindowContextBase::process_expose(XExposeEvent* event) {
     if (jview) {
+        g_print("process_expose %d, %d, %d, %d\n", event->x, event->y, event->width, event->height);
         mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->x, event->y, event->width, event->height);
         CHECK_JNI_EXCEPTION(mainEnv)
     }
@@ -520,21 +521,25 @@ void WindowContextBase::process_key(GdkEventKey* event) {
     }
 }
 
-void WindowContextBase::paint(void* data, jint width, jint height)
-{
-    if (!is_visible()) {
-        return;
-    }
+void WindowContextBase::paint(void* data, jint width, jint height) {
+    g_print("Paint\n");
+
+    XImage* image = XCreateImage(display, vinfo.visual, DefaultDepth(display, DefaultScreen(display)),
+                                 ZPixmap, 0, (char*) data, width, height, 32, 0);
+
+    XPutImage(display, xwindow, DefaultGC(display, 0), image, 0, 0, 0, 0, width, height);
+
+    XFree(image);
 
     //TODO: save visual
-    XImage* image = XCreateImage(display, DefaultVisual(display, 0), 32, ZPixmap, 0, (char *) data, width, height, 32, 0);
-    Pixmap bitmap = XCreatePixmap(display, xwindow, width, height, 1);
-    GC gc = XCreateGC(display, bitmap, 0, NULL);
-    XPutImage(display, bitmap, gc, image, 0, 0, 0, 0, width, height);
-    XCopyArea(display, bitmap, xwindow, gc, 0, 0, width, height, 0, 0);
-    XFreePixmap(display, bitmap);
-    XFreeGC(display, gc);
-    XFree(image);
+//    XImage* image = XCreateImage(display, DefaultVisual(display, 0), 32, ZPixmap, 0, (char *) data, width, height, 32, 0);
+//    Pixmap bitmap = XCreatePixmap(display, xwindow, width, height, 1);
+//    GC gc = XCreateGC(display, bitmap, 0, NULL);
+//    XPutImage(display, bitmap, gc, image, 0, 0, 0, 0, width, height);
+//    XCopyArea(display, bitmap, xwindow, gc, 0, 0, width, height, 0, 0);
+//    XFreePixmap(display, bitmap);
+//    XFreeGC(display, gc);
+//    XFree(image);
 
 //#ifdef GLASS_GTK3
 //    cairo_region_t *region = gdk_window_get_clip_region(gdk_window);
@@ -592,8 +597,9 @@ void WindowContextBase::reparent_children(WindowContext* parent) {
 
 void WindowContextBase::set_visible(bool visible) {
     if (visible) {
-//        XMapWindow(display, xwindow);
-        gtk_widget_show_all(gtk_widget);
+        g_print("XMapWindow\n");
+        XMapWindow(display, xwindow);
+//        gtk_widget_show_all(gtk_widget);
     } else {
         gtk_widget_hide(gtk_widget);
         if (jview && is_mouse_entered) {
@@ -612,7 +618,8 @@ void WindowContextBase::set_visible(bool visible) {
 }
 
 bool WindowContextBase::is_visible() {
-    return gtk_widget_get_visible(gtk_widget);
+    return true;
+//    return gtk_widget_get_visible(gtk_widget);
 }
 
 bool WindowContextBase::set_view(jobject view) {
@@ -781,7 +788,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
     gdk_window = gtk_widget_get_window(gtk_widget);
 
-    xwindow = GDK_WINDOW_XID(gdk_window);
+    //xwindow = GDK_WINDOW_XID(gdk_window);
 
     int mask = KeyPressMask
                | KeyReleaseMask
@@ -790,35 +797,49 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | EnterWindowMask
                | LeaveWindowMask
                | PointerMotionMask
-               | PointerMotionHintMask
-               | Button1MotionMask
-               | Button2MotionMask
-               | Button3MotionMask
-               | Button4MotionMask
-               | Button5MotionMask
+//               | PointerMotionHintMask
+//               | Button1MotionMask
+//               | Button2MotionMask
+//               | Button3MotionMask
+//               | Button4MotionMask
+//               | Button5MotionMask
                | ButtonMotionMask
-               | KeymapStateMask
+//               | KeymapStateMask
                | ExposureMask
-               | VisibilityChangeMask
-               | StructureNotifyMask
-               | ResizeRedirectMask
+//               | VisibilityChangeMask
+//               | StructureNotifyMask
+//               | ResizeRedirectMask
 //               |  SubstructureNotifyMask
 //                SubstructureRedirectMask
                | FocusChangeMask
-               | PropertyChangeMask
+               | PropertyChangeMask;
 //                ColormapChangeMask
-               | OwnerGrabButtonMask;
+//               | OwnerGrabButtonMask;
 
 //    gdk_window_set_events(gdk_window, GDK_FILTERED_EVENTS_MASK);
 //TODO: keep display
     display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+    XMatchVisualInfo(display, DefaultScreen(display), 32, TrueColor, &vinfo);
+
+    XSetWindowAttributes attr;
+    //TODO colormap has visualId
+    attr.colormap = XCreateColormap(display, DefaultRootWindow(display), vinfo.visual, AllocNone);
+    attr.border_pixel = 0;
+    attr.background_pixel = 0x00000000;
+
+    xwindow = XCreateWindow(display, DefaultRootWindow(display), 0, 0,
+                            200, 200, 0, vinfo.depth, InputOutput, vinfo.visual,
+                            CWColormap | CWBorderPixel | CWBackPixel, &attr);
+
+//    xwindow = XCreateSimpleWindow(display, RootWindow(display, 0), 0, 0, 200, 200, 0, 0, 0);
+
     XSelectInput(display, xwindow, mask);
     g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
     XSaveContext(display, xwindow, X_CONTEXT, XPointer(this));
 
     g_object_set_data_full(G_OBJECT(gdk_window), GDK_WINDOW_DATA_CONTEXT, this, NULL);
 
-    gdk_window_register_dnd(gdk_window);
+//    gdk_window_register_dnd(gdk_window);
 
     gdk_windowManagerFunctions = wmf;
     if (wmf) {
