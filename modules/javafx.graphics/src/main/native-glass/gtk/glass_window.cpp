@@ -597,11 +597,11 @@ void WindowContextBase::reparent_children(WindowContext* parent) {
 
 void WindowContextBase::set_visible(bool visible) {
     if (visible) {
-        g_print("XMapWindow\n");
         XMapWindow(display, xwindow);
 //        gtk_widget_show_all(gtk_widget);
     } else {
-        gtk_widget_hide(gtk_widget);
+        XUnmapWindow(display, xwindow);
+//        gtk_widget_hide(gtk_widget);
         if (jview && is_mouse_entered) {
             is_mouse_entered = false;
             mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
@@ -618,8 +618,13 @@ void WindowContextBase::set_visible(bool visible) {
 }
 
 bool WindowContextBase::is_visible() {
-    return true;
+    XWindowAttributes xattr;
+    if (XGetWindowAttributes(display, xwindow, &xattr) == XCSUCCESS) {
+        return !(xattr.map_state == IsUnmapped);
+    }
 //    return gtk_widget_get_visible(gtk_widget);
+
+    return false;
 }
 
 bool WindowContextBase::set_view(jobject view) {
@@ -749,47 +754,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 {
     jwindow = mainEnv->NewGlobalRef(_jwindow);
 
-    gtk_widget =  gtk_window_new(type == POPUP ? GTK_WINDOW_POPUP : GTK_WINDOW_TOPLEVEL);
-
-    if (gchar* app_name = get_application_name()) {
-        gtk_window_set_wmclass(GTK_WINDOW(gtk_widget), app_name, app_name);
-        g_free(app_name);
-    }
-
-    if (owner) {
-        owner->add_child(this);
-        if (on_top_inherited()) {
-            gtk_window_set_keep_above(GTK_WINDOW(gtk_widget), TRUE);
-        }
-    }
-
-    if (type == UTILITY) {
-        gtk_window_set_type_hint(GTK_WINDOW(gtk_widget), GDK_WINDOW_TYPE_HINT_UTILITY);
-    }
-
-//    glong xdisplay = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationDisplay);
-//    gint  xscreenID = (gint)mainEnv->GetStaticIntField(jApplicationCls, jApplicationScreen);
-    glong xvisualID = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
-
-    if (xvisualID != 0) {
-        GdkVisual *visual = gdk_x11_screen_lookup_visual(gdk_screen_get_default(), xvisualID);
-        glass_gtk_window_configure_from_visual(gtk_widget, visual);
-    }
-
-    gtk_widget_set_size_request(gtk_widget, 0, 0);
-    gtk_widget_set_events(gtk_widget, GDK_FILTERED_EVENTS_MASK);
-    gtk_widget_set_app_paintable(gtk_widget, TRUE);
-    if (frame_type != TITLED) {
-        gtk_window_set_decorated(GTK_WINDOW(gtk_widget), FALSE);
-    }
-
-    glass_gtk_configure_transparency_and_realize(gtk_widget, frame_type == TRANSPARENT);
-    gtk_window_set_title(GTK_WINDOW(gtk_widget), "");
-
-    gdk_window = gtk_widget_get_window(gtk_widget);
-
-    //xwindow = GDK_WINDOW_XID(gdk_window);
-
     int mask = KeyPressMask
                | KeyReleaseMask
                | ButtonPressMask
@@ -820,13 +784,19 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 //TODO: keep display
     display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
     XMatchVisualInfo(display, DefaultScreen(display), 32, TrueColor, &vinfo);
+    glong xvisualID = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
+
+    if (xvisualID != 0) {
+//        GdkVisual *visual = gdk_x11_screen_lookup_visual(gdk_screen_get_default(), xvisualID);
+//        glass_gtk_window_configure_from_visual(gtk_widget, visual);
+//        gtk_widget_set_colormap (widget, colormap);
+    }
 
     XSetWindowAttributes attr;
     //TODO colormap has visualId
     attr.colormap = XCreateColormap(display, DefaultRootWindow(display), vinfo.visual, AllocNone);
     attr.border_pixel = 0;
-    attr.background_pixel = 0x00000000;
-
+    attr.background_pixel = 0x00000000; //TODO: frame_type == TRANSPARENT
     xwindow = XCreateWindow(display, DefaultRootWindow(display), 0, 0,
                             200, 200, 0, vinfo.depth, InputOutput, vinfo.visual,
                             CWColormap | CWBorderPixel | CWBackPixel, &attr);
@@ -836,6 +806,42 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     XSelectInput(display, xwindow, mask);
     g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
     XSaveContext(display, xwindow, X_CONTEXT, XPointer(this));
+
+    //TODO: remove
+    gtk_widget = gtk_window_new(type == POPUP ? GTK_WINDOW_POPUP : GTK_WINDOW_TOPLEVEL);
+
+    if (gchar* app_name = get_application_name()) {
+        XClassHint class_hints;
+        class_hints.res_name = app_name;
+        class_hints.res_class = app_name;
+        XSetClassHint(display, xwindow, &class_hints);
+        //gtk_window_set_wmclass(GTK_WINDOW(gtk_widget), app_name, app_name);
+        g_free(app_name);
+    }
+
+    if (owner) {
+        owner->add_child(this);
+        if (on_top_inherited()) {
+            gtk_window_set_keep_above(GTK_WINDOW(gtk_widget), TRUE);
+        }
+    }
+
+    if (type == UTILITY) {
+        gtk_window_set_type_hint(GTK_WINDOW(gtk_widget), GDK_WINDOW_TYPE_HINT_UTILITY);
+    }
+
+//    gtk_widget_set_size_request(gtk_widget, 0, 0);
+//    gtk_widget_set_events(gtk_widget, GDK_FILTERED_EVENTS_MASK);
+    gtk_widget_set_app_paintable(gtk_widget, TRUE);
+    if (frame_type != TITLED) {
+
+//        gtk_window_set_decorated(GTK_WINDOW(gtk_widget), FALSE);
+    }
+
+//    glass_gtk_configure_transparency_and_realize(gtk_widget, frame_type == TRANSPARENT);
+//    gtk_window_set_title(GTK_WINDOW(gtk_widget), "");
+
+    gdk_window = gtk_widget_get_window(gtk_widget);
 
     g_object_set_data_full(G_OBJECT(gdk_window), GDK_WINDOW_DATA_CONTEXT, this, NULL);
 
@@ -1463,7 +1469,8 @@ void WindowContextTop::set_focusable(bool focusable) {
 }
 
 void WindowContextTop::set_title(const char* title) {
-    gtk_window_set_title(GTK_WINDOW(gtk_widget),title);
+    XStoreName(display, xwindow, title);
+//    gtk_window_set_title(GTK_WINDOW(gtk_widget),title);
 }
 
 void WindowContextTop::set_alpha(double alpha) {
