@@ -537,49 +537,12 @@ void WindowContextBase::process_key(GdkEventKey* event) {
 
 void WindowContextBase::paint(void* data, jint width, jint height) {
     g_print("Paint\n");
-
     XImage* image = XCreateImage(display, vinfo.visual, DefaultDepth(display, DefaultScreen(display)),
                                  ZPixmap, 0, (char*) data, width, height, 32, 0);
 
     XPutImage(display, xwindow, DefaultGC(display, 0), image, 0, 0, 0, 0, width, height);
 
     XFree(image);
-
-    //TODO: save visual
-//    XImage* image = XCreateImage(display, DefaultVisual(display, 0), 32, ZPixmap, 0, (char *) data, width, height, 32, 0);
-//    Pixmap bitmap = XCreatePixmap(display, xwindow, width, height, 1);
-//    GC gc = XCreateGC(display, bitmap, 0, NULL);
-//    XPutImage(display, bitmap, gc, image, 0, 0, 0, 0, width, height);
-//    XCopyArea(display, bitmap, xwindow, gc, 0, 0, width, height, 0, 0);
-//    XFreePixmap(display, bitmap);
-//    XFreeGC(display, gc);
-//    XFree(image);
-
-//#ifdef GLASS_GTK3
-//    cairo_region_t *region = gdk_window_get_clip_region(gdk_window);
-//    gdk_window_begin_paint_region(gdk_window, region);
-//#endif
-//    cairo_t* context;
-//    context = gdk_cairo_create(gdk_window);
-//
-//    cairo_surface_t* cairo_surface;
-//    cairo_surface = cairo_image_surface_create_for_data(
-//            (unsigned char*)data,
-//            CAIRO_FORMAT_ARGB32,
-//            width, height, width * 4);
-//
-//    applyShapeMask(data, width, height);
-//
-//    cairo_set_source_surface(context, cairo_surface, 0, 0);
-//    cairo_set_operator (context, CAIRO_OPERATOR_SOURCE);
-//    cairo_paint(context);
-//#ifdef GLASS_GTK3
-//    gdk_window_end_paint(gdk_window);
-//    cairo_region_destroy(region);
-//#endif
-//
-//    cairo_destroy(context);
-//    cairo_surface_destroy(cairo_surface);
 }
 
 void WindowContextBase::add_child(WindowContextTop* child) {
@@ -818,9 +781,9 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                             0, 0, 0, vinfo.depth, InputOutput, vinfo.visual,
                             CWColormap | CWBorderPixel | CWBackPixel, &attr);
 
-    XSelectInput(display, xwindow, mask);
     g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
     XSaveContext(display, xwindow, X_CONTEXT, XPointer(this));
+    XSelectInput(display, xwindow, mask);
 
     //TODO: remove
     gtk_widget = gtk_window_new(type == POPUP ? GTK_WINDOW_POPUP : GTK_WINDOW_TOPLEVEL);
@@ -847,7 +810,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
 //    gtk_widget_set_size_request(gtk_widget, 0, 0);
 //    gtk_widget_set_events(gtk_widget, GDK_FILTERED_EVENTS_MASK);
-    gtk_widget_set_app_paintable(gtk_widget, TRUE);
+//    gtk_widget_set_app_paintable(gtk_widget, TRUE);
     if (frame_type != TITLED) {
 //TODO:
 //        Hints hints;
