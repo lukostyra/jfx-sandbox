@@ -158,7 +158,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                 g_print("X11 Button Release\n");
                 break;
             case MotionNotify:
-                g_print("Pointer motion\n");
+                ctx->process_mouse_motion(&xevent.xmotion);
                 break;
         }
 

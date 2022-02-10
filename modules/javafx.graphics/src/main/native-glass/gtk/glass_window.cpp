@@ -353,7 +353,11 @@ void WindowContextBase::process_mouse_button(GdkEventButton* event) {
 }
 
 void WindowContextBase::process_mouse_motion(GdkEventMotion* event) {
+}
+
+void WindowContextBase::process_mouse_motion(XMotionEvent* event) {
     jint glass_modifier = gdk_modifier_mask_to_glass(event->state);
+
     jint isDrag = glass_modifier & (
             com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_PRIMARY |
             com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_MIDDLE |
@@ -796,12 +800,13 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     //TODO colormap has visualId
     attr.colormap = XCreateColormap(display, DefaultRootWindow(display), vinfo.visual, AllocNone);
     attr.border_pixel = 0;
-    attr.background_pixel = 0x00000000; //TODO: frame_type == TRANSPARENT
+    attr.background_pixel = (frame_type == TRANSPARENT)
+                                ? 0x00000000
+                                : XWhitePixel(display, XDefaultScreen(display));
+
     xwindow = XCreateWindow(display, DefaultRootWindow(display), 0, 0,
                             200, 200, 0, vinfo.depth, InputOutput, vinfo.visual,
                             CWColormap | CWBorderPixel | CWBackPixel, &attr);
-
-//    xwindow = XCreateSimpleWindow(display, RootWindow(display, 0), 0, 0, 200, 200, 0, 0, 0);
 
     XSelectInput(display, xwindow, mask);
     g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
@@ -834,7 +839,13 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 //    gtk_widget_set_events(gtk_widget, GDK_FILTERED_EVENTS_MASK);
     gtk_widget_set_app_paintable(gtk_widget, TRUE);
     if (frame_type != TITLED) {
-
+//TODO:
+//        Hints hints;
+//        Atom property;
+//        hints.flags = 2;
+//        hints.decorations = 0;
+//        property = XInternAtom(display, "_MOTIF_WM_HINTS", true);
+//        XChangeProperty(display, xwindow, property, property, 32, PropModeReplace,(unsigned char *)&hints, 5);
 //        gtk_window_set_decorated(GTK_WINDOW(gtk_widget), FALSE);
     }
 
