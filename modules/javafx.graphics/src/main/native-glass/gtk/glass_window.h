@@ -144,6 +144,7 @@ public:
     virtual void process_configure(XConfigureEvent*) = 0;
     virtual void process_map() = 0;
     virtual void process_focus(GdkEventFocus*) = 0;
+    virtual void process_focus(XFocusChangeEvent*) = 0;
     virtual void process_destroy() = 0;
     virtual void process_delete() = 0;
     virtual void process_expose(GdkEventExpose*) = 0;
@@ -248,6 +249,7 @@ public:
 
     void process_map() {}
     void process_focus(GdkEventFocus*);
+    void process_focus(XFocusChangeEvent*);
     void process_destroy();
     void process_delete();
     void process_expose(GdkEventExpose*);

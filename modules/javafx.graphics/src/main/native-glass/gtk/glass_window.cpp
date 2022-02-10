@@ -133,15 +133,20 @@ void WindowContextBase::process_state(GdkEventWindowState* event) {
 }
 
 void WindowContextBase::process_focus(GdkEventFocus* event) {
-    if (!event->in && WindowContextBase::sm_mouse_drag_window == this) {
+}
+
+void WindowContextBase::process_focus(XFocusChangeEvent* event) {
+    bool in = event->type == FocusIn;
+
+    if (!in && WindowContextBase::sm_mouse_drag_window == this) {
         ungrab_mouse_drag_focus();
     }
-    if (!event->in && WindowContextBase::sm_grab_window == this) {
+    if (!in && WindowContextBase::sm_grab_window == this) {
         ungrab_focus();
     }
 
     if (xim.enabled && xim.ic) {
-        if (event->in) {
+        if (in) {
             XSetICFocus(xim.ic);
         } else {
             XUnsetICFocus(xim.ic);
@@ -149,9 +154,9 @@ void WindowContextBase::process_focus(GdkEventFocus* event) {
     }
 
     if (jwindow) {
-        if (!event->in || isEnabled()) {
+        if (!in || isEnabled()) {
             mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus,
-                    event->in ? com_sun_glass_events_WindowEvent_FOCUS_GAINED : com_sun_glass_events_WindowEvent_FOCUS_LOST);
+                        in ? com_sun_glass_events_WindowEvent_FOCUS_GAINED : com_sun_glass_events_WindowEvent_FOCUS_LOST);
             CHECK_JNI_EXCEPTION(mainEnv)
         } else {
             mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocusDisabled);

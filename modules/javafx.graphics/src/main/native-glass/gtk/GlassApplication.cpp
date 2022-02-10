@@ -146,6 +146,10 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             case MapNotify:
                 ctx->process_map();
                 break;
+            case FocusIn:
+            case FocusOut:
+                ctx->process_focus(&xevent.xfocus);
+                break;
             case Expose:
                 g_print("X11 Expose\n");
                 ctx->process_expose(&xevent.xexpose);
@@ -155,10 +159,8 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                 g_print("X11 Key\n");
                 break;
             case ButtonPress:
-                g_print("X11 Button Press\n");
-                break;
             case ButtonRelease:
-                g_print("X11 Button Release\n");
+                g_print("X11 Button\n");
                 break;
             case MotionNotify:
                 ctx->process_mouse_motion(&xevent.xmotion);
