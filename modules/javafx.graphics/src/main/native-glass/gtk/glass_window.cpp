@@ -435,7 +435,12 @@ void WindowContextBase::process_mouse_scroll(GdkEventScroll* event) {
 }
 
 void WindowContextBase::process_mouse_cross(GdkEventCrossing* event) {
-    bool enter = event->type == GDK_ENTER_NOTIFY;
+
+}
+
+void WindowContextBase::process_mouse_cross(XCrossingEvent* event) {
+    bool enter = event->type == EnterNotify;
+
     if (jview) {
         guint state = event->state;
         if (enter) { // workaround for RT-21590

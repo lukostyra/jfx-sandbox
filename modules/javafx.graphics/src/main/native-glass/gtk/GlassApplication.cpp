@@ -160,6 +160,10 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             case MotionNotify:
                 ctx->process_mouse_motion(&xevent.xmotion);
                 break;
+            case EnterNotify:
+            case LeaveNotify:
+                ctx->process_mouse_cross(&xevent.xcrossing);
+                break;
         }
 
         //TODO: Remove
