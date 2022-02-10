@@ -143,6 +143,9 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             case ConfigureNotify:
                 ctx->process_configure(&xevent.xconfigure);
                 break;
+            case MapNotify:
+                ctx->process_map();
+                break;
             case Expose:
                 g_print("X11 Expose\n");
                 ctx->process_expose(&xevent.xexpose);
