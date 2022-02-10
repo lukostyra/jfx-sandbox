@@ -1114,39 +1114,45 @@ void WindowContextTop::process_property_notify(GdkEventProperty* event) {
 }
 
 void WindowContextTop::process_configure(GdkEventConfigure* event) {
-    gint x, y, w, h;
+}
+
+void WindowContextTop::process_configure(XConfigureEvent* event) {
+    int x, y, w, h;
     bool updateWindowConstraints = false;
-    if (gtk_window_get_decorated(GTK_WINDOW(gtk_widget))) {
-        GdkRectangle frame;
-        gint top, left, bottom, right;
 
-        gdk_window_get_frame_extents(gdk_window, &frame);
-#ifdef GLASS_GTK3
-        gdk_window_get_geometry(gdk_window, NULL, NULL, &w, &h);
-#else
-        gdk_window_get_geometry(gdk_window, NULL, NULL, &w, &h, NULL);
-#endif
-        x = frame.x;
-        y = frame.y;
-        geometry.current_width = frame.width;
-        geometry.current_height = frame.height;
-
-        if (update_frame_extents()) {
-            updateWindowConstraints = true;
-            if (!frame_extents_initialized && !is_null_extents()) {
-                frame_extents_initialized = true;
-                set_bounds(0, 0, false, false,
-                    requested_bounds.width, requested_bounds.height,
-                    requested_bounds.client_width, requested_bounds.client_height
-                );
-            }
-        }
-    } else {
+//    if (gtk_window_get_decorated(GTK_WINDOW(gtk_widget))) {
+    //TODO
+//    if (true) {
+//        GdkRectangle frame;
+//        gint top, left, bottom, right;
+//
+//        gdk_window_get_frame_extents(gdk_window, &frame);
+//#ifdef GLASS_GTK3
+//        gdk_window_get_geometry(gdk_window, NULL, NULL, &w, &h);
+//#else
+//        gdk_window_get_geometry(gdk_window, NULL, NULL, &w, &h, NULL);
+//#endif
+//        x = frame.x;
+//        y = frame.y;
+//        geometry.current_width = frame.width;
+//        geometry.current_height = frame.height;
+//
+//        if (update_frame_extents()) {
+//            updateWindowConstraints = true;
+//            if (!frame_extents_initialized && !is_null_extents()) {
+//                frame_extents_initialized = true;
+//                set_bounds(0, 0, false, false,
+//                    requested_bounds.width, requested_bounds.height,
+//                    requested_bounds.client_width, requested_bounds.client_height
+//                );
+//            }
+//        }
+//    } else {
         x = event->x;
         y = event->y;
         w = event->width;
         h = event->height;
-    }
+//    }
 
     if (size_assigned && w <= 1 && h <= 1 && (geometry.final_width.value > 1 ||
                                              geometry.final_height.value > 1)) {
@@ -1210,13 +1216,6 @@ void WindowContextTop::process_configure(GdkEventConfigure* event) {
     }
 }
 
-void WindowContextTop::process_configure(XConfigureEvent* event) {
-    g_print("PROCESS_CONFIGURE\n");
-
-//    XResizeWindow(display, xwindow, 400, 400);
-    //XMoveResizeWindow(display, xwindow, 200, 200, 400, 400);
-}
-
 void WindowContextTop::update_window_constraints() {
     if (resizable.value) {
         XSizeHints* hints = XAllocSizeHints();
@@ -1260,11 +1259,27 @@ void WindowContextTop::set_window_resizable(bool res) {
         int w = geometry_get_content_width(&geometry);
         int h = geometry_get_content_height(&geometry);
         if (w == -1 && h == -1) {
-            gtk_window_get_size(GTK_WINDOW(gtk_widget), &w, &h);
+            XWindowAttributes xattr;
+            if (XGetWindowAttributes(display, xwindow, &xattr) == XCSUCCESS) {
+                w = xattr.width;
+                h = xattr.height;
+            }
         }
-        GdkGeometry geom = {w, h, w, h, 0, 0, 0, 0, 0.0, 0.0, GDK_GRAVITY_NORTH_WEST};
-        gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom,
-                static_cast<GdkWindowHints>(GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE));
+
+        XSizeHints* hints = XAllocSizeHints();
+
+        hints->min_width = w;
+        hints->min_height = h;
+        hints->max_width = w;
+        hints->max_height = h;
+        hints->flags = (PMinSize | PMaxSize);
+
+        //FIXME: maybe XSetWMSizeHints?
+        XSetWMNormalHints(display, xwindow, hints);
+
+//        GdkGeometry geom = {w, h, w, h, 0, 0, 0, 0, 0.0, 0.0, GDK_GRAVITY_NORTH_WEST};
+//        gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom,
+//                static_cast<GdkWindowHints>(GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE));
         resizable.value = false;
     } else {
         resizable.value = true;
