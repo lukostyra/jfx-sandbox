@@ -1219,19 +1219,39 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
 
 void WindowContextTop::update_window_constraints() {
     if (resizable.value) {
-        GdkGeometry geom = {
-            (resizable.minw == -1) ? 1
-                    : resizable.minw - geometry.extents.left - geometry.extents.right,
-            (resizable.minh == -1) ? 1
-                    : resizable.minh - geometry.extents.top - geometry.extents.bottom,
-            (resizable.maxw == -1) ? 100000
-                    : resizable.maxw - geometry.extents.left - geometry.extents.right,
-            (resizable.maxh == -1) ? 100000
-                    : resizable.maxh - geometry.extents.top - geometry.extents.bottom,
-            0, 0, 0, 0, 0.0, 0.0, GDK_GRAVITY_NORTH_WEST
-        };
-        gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom,
-                static_cast<GdkWindowHints> (GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE));
+        XSizeHints* hints = XAllocSizeHints();
+
+        hints->min_width = (resizable.minw == -1) ? 1
+                           : resizable.minw - geometry.extents.left - geometry.extents.right;
+
+        hints->min_height = (resizable.minh == -1) ? 1
+                            : resizable.minh - geometry.extents.top - geometry.extents.bottom;
+
+        hints->max_width = (resizable.maxw == -1) ? 100000
+                            : resizable.maxw - geometry.extents.left - geometry.extents.right;
+
+        hints->max_height = (resizable.maxh == -1) ? 100000
+                           : resizable.maxh - geometry.extents.top - geometry.extents.bottom;
+
+        hints->flags = (PMinSize | PMaxSize);
+
+        //FIXME: maybe XSetWMSizeHints?
+        XSetWMNormalHints(display, xwindow, hints);
+
+
+//        GdkGeometry geom = {
+//            (resizable.minw == -1) ? 1
+//                    : resizable.minw - geometry.extents.left - geometry.extents.right,
+//            (resizable.minh == -1) ? 1
+//                    : resizable.minh - geometry.extents.top - geometry.extents.bottom,
+//            (resizable.maxw == -1) ? 100000
+//                    : resizable.maxw - geometry.extents.left - geometry.extents.right,
+//            (resizable.maxh == -1) ? 100000
+//                    : resizable.maxh - geometry.extents.top - geometry.extents.bottom,
+//            0, 0, 0, 0, 0.0, 0.0, GDK_GRAVITY_NORTH_WEST
+//        };
+//        gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom,
+//                static_cast<GdkWindowHints> (GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE));
     }
 }
 
