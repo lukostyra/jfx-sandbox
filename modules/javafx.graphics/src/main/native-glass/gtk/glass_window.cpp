@@ -859,7 +859,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 //        gtk_window_set_decorated(GTK_WINDOW(gtk_widget), FALSE);
     }
 
-//    glass_gtk_configure_transparency_and_realize(gtk_widget, frame_type == TRANSPARENT);
+    glass_gtk_configure_transparency_and_realize(gtk_widget, frame_type == TRANSPARENT);
 //    gtk_window_set_title(GTK_WINDOW(gtk_widget), "");
 
     gdk_window = gtk_widget_get_window(gtk_widget);
