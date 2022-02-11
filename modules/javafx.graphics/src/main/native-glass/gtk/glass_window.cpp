@@ -738,24 +738,24 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | EnterWindowMask
                | LeaveWindowMask
                | PointerMotionMask
-//               | PointerMotionHintMask
-//               | Button1MotionMask
-//               | Button2MotionMask
-//               | Button3MotionMask
-//               | Button4MotionMask
-//               | Button5MotionMask
+               | PointerMotionHintMask
+               | Button1MotionMask
+               | Button2MotionMask
+               | Button3MotionMask
+               | Button4MotionMask
+               | Button5MotionMask
                | ButtonMotionMask
-//               | KeymapStateMask
+               | KeymapStateMask
                | ExposureMask
-//               | VisibilityChangeMask
-//               | StructureNotifyMask
-//               | ResizeRedirectMask
-//               |  SubstructureNotifyMask
-//                SubstructureRedirectMask
+               | VisibilityChangeMask
+               | StructureNotifyMask
+               | ResizeRedirectMask
+               | SubstructureNotifyMask
+               | SubstructureRedirectMask
                | FocusChangeMask
-               | PropertyChangeMask;
-//                ColormapChangeMask
-//               | OwnerGrabButtonMask;
+               | PropertyChangeMask
+               | ColormapChangeMask
+               | OwnerGrabButtonMask;
 
 //    gdk_window_set_events(gdk_window, GDK_FILTERED_EVENTS_MASK);
 //TODO: keep display
@@ -778,11 +778,14 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                                 : XWhitePixel(display, XDefaultScreen(display));
 
     xwindow = XCreateWindow(display, DefaultRootWindow(display), 0, 0,
-                            0, 0, 0, vinfo.depth, InputOutput, vinfo.visual,
+                            200, 200, 0, vinfo.depth, InputOutput, vinfo.visual,
                             CWColormap | CWBorderPixel | CWBackPixel, &attr);
 
     g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
-    XSaveContext(display, xwindow, X_CONTEXT, XPointer(this));
+    if (XSaveContext(display, xwindow, X_CONTEXT, XPointer(this)) != XCSUCCESS) {
+        g_print("Fail to save context\n");
+    }
+
     XSelectInput(display, xwindow, mask);
 
     //TODO: remove
@@ -831,14 +834,14 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
 //    gdk_window_register_dnd(gdk_window);
 
-    gdk_windowManagerFunctions = wmf;
-    if (wmf) {
-        gdk_window_set_functions(gdk_window, wmf);
-    }
-
-    if (frame_type == TITLED) {
-        request_frame_extents();
-    }
+//    gdk_windowManagerFunctions = wmf;
+//    if (wmf) {
+//        gdk_window_set_functions(gdk_window, wmf);
+//    }
+//
+//    if (frame_type == TITLED) {
+//        request_frame_extents();
+//    }
 }
 
 // Applied to a temporary full screen window to prevent sending events to Java
@@ -1180,6 +1183,7 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
 }
 
 void WindowContextTop::update_window_constraints() {
+    g_print("update_window_constraints\n");
     if (resizable.value) {
         XSizeHints* hints = XAllocSizeHints();
 
@@ -1218,6 +1222,7 @@ void WindowContextTop::update_window_constraints() {
 }
 
 void WindowContextTop::set_window_resizable(bool res) {
+    g_print("set_window_resizable\n");
     if(!res) {
         int w = geometry_get_content_width(&geometry);
         int h = geometry_get_content_height(&geometry);
@@ -1282,6 +1287,8 @@ void WindowContextTop::set_visible(bool visible)
 }
 
 void WindowContextTop::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h, int cw, int ch) {
+    g_print("set_bounds\n");
+
     requested_bounds.width = w;
     requested_bounds.height = h;
     requested_bounds.client_width = cw;
@@ -1356,6 +1363,8 @@ void WindowContextTop::process_map() {
 }
 
 void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned int windowChangesMask) {
+    g_print("window_configure\n");
+
     if (windowChangesMask == 0) {
         return;
     }

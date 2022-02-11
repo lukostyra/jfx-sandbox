@@ -132,47 +132,55 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
     while (XPending(display)) {
         XNextEvent(display, &xevent);
 
-//        g_print("Event %d\n", xevent.type);
-
         if (XFindContext(display, xevent.xany.window, X_CONTEXT, (XPointer *) &ctx) != XCSUCCESS) {
-            g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
+//            g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
             continue;
         }
 
-        switch (xevent.type) {
-            case ConfigureNotify:
-                ctx->process_configure(&xevent.xconfigure);
-                break;
-            case MapNotify:
-                g_print("X11 MAP\n");
-                ctx->process_map();
-                break;
-            case FocusIn:
-            case FocusOut:
-                g_print("X11 Focus\n");
-                ctx->process_focus(&xevent.xfocus);
-                break;
-            case Expose:
-                g_print("X11 Expose\n");
-                ctx->process_expose(&xevent.xexpose);
-                break;
-            case KeyPress:
-            case KeyRelease:
-                g_print("X11 Key\n");
-                break;
-            case ButtonPress:
-            case ButtonRelease:
-                g_print("X11 Button\n");
-                break;
-            case MotionNotify:
-                g_print("X11 Motion\n");
-                ctx->process_mouse_motion(&xevent.xmotion);
-                break;
-            case EnterNotify:
-            case LeaveNotify:
-                g_print("X11 Xssing\n");
-                ctx->process_mouse_cross(&xevent.xcrossing);
-                break;
+//        if (ctx->hasIME() && ctx->filterIME(event)) {
+//            continue;
+//        }
+
+        g_print("Event %d\n", xevent.type);
+        EventsCounterHelper helper(ctx);
+        try {
+            switch (xevent.type) {
+                case ConfigureNotify:
+                    g_print("X11 Configure\n");
+                    ctx->process_configure(&xevent.xconfigure);
+                    break;
+                case MapNotify:
+                    g_print("X11 MAP\n");
+                    ctx->process_map();
+                    break;
+                case FocusIn:
+                case FocusOut:
+                    g_print("X11 Focus\n");
+                    ctx->process_focus(&xevent.xfocus);
+                    break;
+                case Expose:
+                    g_print("X11 Expose\n");
+                    ctx->process_expose(&xevent.xexpose);
+                    break;
+                case KeyPress:
+                case KeyRelease:
+                    g_print("X11 Key\n");
+                    break;
+                case ButtonPress:
+                case ButtonRelease:
+                    g_print("X11 Button\n");
+                    break;
+                case MotionNotify:
+                    g_print("X11 Motion\n");
+                    ctx->process_mouse_motion(&xevent.xmotion);
+                    break;
+                case EnterNotify:
+                case LeaveNotify:
+                    g_print("X11 Xssing\n");
+                    ctx->process_mouse_cross(&xevent.xcrossing);
+                    break;
+            }
+        } catch (jni_exception&) {
         }
 
         //TODO: Remove
