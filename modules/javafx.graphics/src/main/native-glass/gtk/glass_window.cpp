@@ -542,7 +542,7 @@ void WindowContextBase::paint(void* data, jint width, jint height) {
 
     XPutImage(display, xwindow, DefaultGC(display, 0), image, 0, 0, 0, 0, width, height);
 
-    XFree(image);
+    XDestroyImage(image);
 }
 
 void WindowContextBase::add_child(WindowContextTop* child) {
