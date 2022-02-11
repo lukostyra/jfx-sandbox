@@ -195,7 +195,7 @@ protected:
     GdkWindow* gdk_window;
     Window xwindow;
     Display* display;
-    XVisualInfo vinfo;
+    Visual* visual;
 
     GdkWMFunction gdk_windowManagerFunctions;
 

@@ -537,7 +537,7 @@ void WindowContextBase::process_key(GdkEventKey* event) {
 
 void WindowContextBase::paint(void* data, jint width, jint height) {
     g_print("Paint\n");
-    XImage* image = XCreateImage(display, vinfo.visual, DefaultDepth(display, DefaultScreen(display)),
+    XImage* image = XCreateImage(display, visual, DefaultDepth(display, DefaultScreen(display)),
                                  ZPixmap, 0, (char*) data, width, height, 32, 0);
 
     XPutImage(display, xwindow, DefaultGC(display, 0), image, 0, 0, 0, 0, width, height);
@@ -596,7 +596,7 @@ void WindowContextBase::set_visible(bool visible) {
 
 bool WindowContextBase::is_visible() {
     XWindowAttributes xattr;
-    if (XGetWindowAttributes(display, xwindow, &xattr) == XCSUCCESS) {
+    if (XGetWindowAttributes(display, xwindow, &xattr)) {
         return !(xattr.map_state == IsUnmapped);
     }
 //    return gtk_widget_get_visible(gtk_widget);
@@ -760,7 +760,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 //    gdk_window_set_events(gdk_window, GDK_FILTERED_EVENTS_MASK);
 //TODO: keep display
     display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
-    XMatchVisualInfo(display, DefaultScreen(display), 32, TrueColor, &vinfo);
+//    XMatchVisualInfo(display, DefaultScreen(display), 32, TrueColor, &vinfo);
     glong xvisualID = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
 
     if (xvisualID != 0) {
@@ -769,21 +769,32 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 //        gtk_widget_set_colormap (widget, colormap);
     }
 
-    XSetWindowAttributes attr;
-    //TODO colormap has visualId
-    attr.colormap = XCreateColormap(display, DefaultRootWindow(display), vinfo.visual, AllocNone);
-    attr.border_pixel = 0;
-    attr.background_pixel = (frame_type == TRANSPARENT)
-                                ? 0x00000000
-                                : XWhitePixel(display, XDefaultScreen(display));
+//    XSetWindowAttributes attr;
+//    //TODO colormap has visualId
+//    attr.colormap = XCreateColormap(display, DefaultRootWindow(display), vinfo.visual, AllocNone);
+//    attr.border_pixel = 0;
+//    attr.background_pixel = (frame_type == TRANSPARENT)
+//                                ? 0x00000000
+//                                : XWhitePixel(display, XDefaultScreen(display));
 
-    xwindow = XCreateWindow(display, DefaultRootWindow(display), 0, 0,
-                            200, 200, 0, vinfo.depth, InputOutput, vinfo.visual,
-                            CWColormap | CWBorderPixel | CWBackPixel, &attr);
+//    xwindow = XCreateWindow(display, DefaultRootWindow(display), 0, 0,
+//                            200, 200, 0, vinfo.depth, InputOutput, vinfo.visual,
+//                            CWColormap | CWBorderPixel | CWBackPixel, &attr);
+
+    unsigned long bg = (frame_type == TRANSPARENT)
+                         ? 0x00000000
+                         : XWhitePixel(display, XDefaultScreen(display));
+
+    xwindow =  XCreateSimpleWindow(display, DefaultRootWindow(display), 0, 0, 200, 200, 0, 0, bg);
 
     g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
-    if (XSaveContext(display, xwindow, X_CONTEXT, XPointer(this)) != XCSUCCESS) {
+    if (XSaveContext(display, xwindow, X_CONTEXT, XPointer(this)) != 0) {
         g_print("Fail to save context\n");
+    }
+
+    XWindowAttributes xattr;
+    if (XGetWindowAttributes(display, xwindow, &xattr)) {
+        visual = xattr.visual;
     }
 
     XSelectInput(display, xwindow, mask);
@@ -1228,7 +1239,7 @@ void WindowContextTop::set_window_resizable(bool res) {
         int h = geometry_get_content_height(&geometry);
         if (w == -1 && h == -1) {
             XWindowAttributes xattr;
-            if (XGetWindowAttributes(display, xwindow, &xattr) == XCSUCCESS) {
+            if (XGetWindowAttributes(display, xwindow, &xattr)) {
                 w = xattr.width;
                 h = xattr.height;
             }
@@ -1287,7 +1298,7 @@ void WindowContextTop::set_visible(bool visible)
 }
 
 void WindowContextTop::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h, int cw, int ch) {
-    g_print("set_bounds\n");
+    g_print("set_bounds: %d, %d, %d, %d, %d, %d\n", x, y, w, h, cw, ch);
 
     requested_bounds.width = w;
     requested_bounds.height = h;
@@ -1363,14 +1374,15 @@ void WindowContextTop::process_map() {
 }
 
 void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned int windowChangesMask) {
-    g_print("window_configure\n");
+    g_print("window_configure: %d\n", windowChangesMask);
 
     if (windowChangesMask == 0) {
         return;
     }
 
     XWindowAttributes xattr;
-    if (XGetWindowAttributes(display, xwindow, &xattr) != XCSUCCESS) {
+    if (!XGetWindowAttributes(display, xwindow, &xattr)) {
+        g_print("XGetWindowAttributes FAIL!\n");
         return;
     }
 
@@ -1386,6 +1398,7 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
             newY = windowChanges->y;
         }
 
+        g_print("XMoveWindow: %d, %d\n", newX, newY);
         XMoveWindow(display, xwindow, newX, newY);
     }
 
@@ -1411,6 +1424,7 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         }
 
         XResizeWindow(display, xwindow, newWidth, newHeight);
+        g_print("XResizeWindow: %d, %d\n", newWidth, newHeight);
 
         //JDK-8193502: Moved here from WindowContextBase::set_view because set_view is called
         //first and the size is not set yet. This also guarantees that the size will be correct
