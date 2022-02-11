@@ -145,6 +145,9 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
         EventsCounterHelper helper(ctx);
         try {
             switch (xevent.type) {
+                case ConfigureRequest:
+                    g_print("============> X11 Configure Request\n");
+                    break;
                 case ConfigureNotify:
                     g_print("X11 Configure\n");
                     ctx->process_configure(&xevent.xconfigure);

@@ -738,24 +738,25 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | EnterWindowMask
                | LeaveWindowMask
                | PointerMotionMask
-               | PointerMotionHintMask
+//               | PointerMotionHintMask
                | Button1MotionMask
                | Button2MotionMask
                | Button3MotionMask
+               //Mouse Wheel
                | Button4MotionMask
                | Button5MotionMask
                | ButtonMotionMask
-               | KeymapStateMask
+//               | KeymapStateMask
                | ExposureMask
-               | VisibilityChangeMask
+//               | VisibilityChangeMask
                | StructureNotifyMask
-               | ResizeRedirectMask
+//               | ResizeRedirectMask
                | SubstructureNotifyMask
-//               | SubstructureRedirectMask
+               | SubstructureRedirectMask
                | FocusChangeMask
-               | PropertyChangeMask
-               | ColormapChangeMask
-               | OwnerGrabButtonMask;
+               | PropertyChangeMask;
+//               | ColormapChangeMask
+//               | OwnerGrabButtonMask;
 
     display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
     visual = DefaultVisual(display, DefaultScreen(display));
@@ -781,41 +782,31 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     attr.border_pixel = 0;
     attr.background_pixel = (frame_type == TRANSPARENT)
                                 ? 0x00000000
-                                : XWhitePixel(display, DefaultScreen(display));
-    attr.override_redirect = 1;
+                                : WhitePixel(display, DefaultScreen(display));
+    attr.override_redirect = (type == POPUP) ? True : False;
+    attr.bit_gravity = NorthWestGravity;
+    attr.event_mask = mask;
 
     xwindow = XCreateWindow(display, DefaultRootWindow(display), 0, 0,
                             200, 200, 0, depth, InputOutput, visual,
-                            CWOverrideRedirect | CWColormap | CWBorderPixel | CWBackPixel, &attr);
-//CWOverrideRedirect
-//    unsigned long bg = (frame_type == TRANSPARENT)
-//                         ? 0x00000000
-//                         : XWhitePixel(display, XDefaultScreen(display));
-//
-//    xwindow =  XCreateSimpleWindow(display, DefaultRootWindow(display), 0, 0, 200, 200, 0, 0, bg);
+                            CWEventMask | /*CWOverrideRedirect |*/ CWBitGravity |
+                            CWColormap | CWBorderPixel | CWBackPixel, &attr);
 
     g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
     if (XSaveContext(display, xwindow, X_CONTEXT, XPointer(this)) != 0) {
         g_print("Fail to save context\n");
     }
 
-//    XWindowAttributes xattr;
-//    if (XGetWindowAttributes(display, xwindow, &xattr)) {
-//        visual = xattr.visual;
-//    }
-
-    XSelectInput(display, xwindow, mask);
-
     //TODO: remove
     gtk_widget = gtk_window_new(type == POPUP ? GTK_WINDOW_POPUP : GTK_WINDOW_TOPLEVEL);
 
     if (gchar* app_name = get_application_name()) {
-        XClassHint class_hints;
-        class_hints.res_name = app_name;
-        class_hints.res_class = app_name;
-        XSetClassHint(display, xwindow, &class_hints);
-        //gtk_window_set_wmclass(GTK_WINDOW(gtk_widget), app_name, app_name);
+        XClassHint *class_hints = XAllocClassHint();
+        class_hints->res_name = app_name;
+        class_hints->res_class = app_name;
+        XSetClassHint(display, xwindow, class_hints);
         g_free(app_name);
+        XFree(class_hints);
     }
 
     if (owner) {
