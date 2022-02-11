@@ -748,11 +748,11 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | ButtonMotionMask
 //               | KeymapStateMask
                | ExposureMask
-//               | VisibilityChangeMask
+               | VisibilityChangeMask
                | StructureNotifyMask
 //               | ResizeRedirectMask
                | SubstructureNotifyMask
-               | SubstructureRedirectMask
+//               | SubstructureRedirectMask
                | FocusChangeMask
                | PropertyChangeMask;
 //               | ColormapChangeMask
@@ -1389,11 +1389,10 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         return;
     }
 
-    int newX, newY;
-    newX = xattr.x;
-    newY = xattr.y;
-
     if (windowChangesMask & (CWX | CWY)) {
+        int newX, newY;
+        newX = xattr.x;
+        newY = xattr.y;
 
         if (windowChangesMask & CWX) {
             newX = windowChanges->x;
@@ -1403,11 +1402,12 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         }
     }
 
-    int newWidth, newHeight;
-    newWidth = xattr.width;
-    newHeight = xattr.height;
 
+    int newWidth, newHeight;
     if (windowChangesMask & (CWWidth | CWHeight)) {
+        newWidth = xattr.width;
+        newHeight = xattr.height;
+
         if (windowChangesMask & CWWidth) {
             newWidth = windowChanges->width;
         }
@@ -1423,10 +1423,10 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
 //            geom.min_height = geom.max_height = newHeight;
 //            gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom, hints);
         }
+
     }
 
-    XMoveResizeWindow(display, xwindow, newX, newY, newWidth, newHeight);
-    g_print("XMoveResizeWindow %d, %d, %d, %d\n", newX, newY, newWidth, newHeight);
+    XConfigureWindow(display, xwindow, windowChangesMask, windowChanges);
 
     if (windowChangesMask & (CWWidth | CWHeight)) {
         //JDK-8193502: Moved here from WindowContextBase::set_view because set_view is called
