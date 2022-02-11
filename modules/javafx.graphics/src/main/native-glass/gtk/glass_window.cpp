@@ -1213,8 +1213,10 @@ void WindowContextTop::update_window_constraints() {
         hints->flags = (PMinSize | PMaxSize);
 
         //FIXME: maybe XSetWMSizeHints?
+        g_print("XSetWMNormalHints: constraints\n");
         XSetWMNormalHints(display, xwindow, hints);
 
+        XFree(hints);
 
 //        GdkGeometry geom = {
 //            (resizable.minw == -1) ? 1
@@ -1254,7 +1256,10 @@ void WindowContextTop::set_window_resizable(bool res) {
         hints->flags = (PMinSize | PMaxSize);
 
         //FIXME: maybe XSetWMSizeHints?
+        g_print("XSetWMNormalHints: not resizable, %d, %d\n", w, h);
         XSetWMNormalHints(display, xwindow, hints);
+
+        XFree(hints);
 
 //        GdkGeometry geom = {w, h, w, h, 0, 0, 0, 0, 0.0, 0.0, GDK_GRAVITY_NORTH_WEST};
 //        gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom,
@@ -1386,10 +1391,11 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         return;
     }
 
+    int newX, newY;
+    newX = xattr.x;
+    newY = xattr.y;
+
     if (windowChangesMask & (CWX | CWY)) {
-        int newX, newY;
-        newX = xattr.x;
-        newY = xattr.y;
 
         if (windowChangesMask & CWX) {
             newX = windowChanges->x;
@@ -1397,16 +1403,13 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         if (windowChangesMask & CWY) {
             newY = windowChanges->y;
         }
-
-        g_print("XMoveWindow: %d, %d\n", newX, newY);
-        XMoveWindow(display, xwindow, newX, newY);
     }
 
-    if (windowChangesMask & (CWWidth | CWHeight)) {
-        int newWidth, newHeight;
-        newWidth = xattr.width;
-        newHeight = xattr.height;
+    int newWidth, newHeight;
+    newWidth = xattr.width;
+    newHeight = xattr.height;
 
+    if (windowChangesMask & (CWWidth | CWHeight)) {
         if (windowChangesMask & CWWidth) {
             newWidth = windowChanges->width;
         }
@@ -1422,10 +1425,12 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
 //            geom.min_height = geom.max_height = newHeight;
 //            gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom, hints);
         }
+    }
 
-        XResizeWindow(display, xwindow, newWidth, newHeight);
-        g_print("XResizeWindow: %d, %d\n", newWidth, newHeight);
+    XMoveResizeWindow(display, xwindow, newX, newY, newWidth, newHeight);
+    g_print("XMoveResizeWindow %d, %d, %d, %d\n", newX, newY, newWidth, newHeight);
 
+    if (windowChangesMask & (CWWidth | CWHeight)) {
         //JDK-8193502: Moved here from WindowContextBase::set_view because set_view is called
         //first and the size is not set yet. This also guarantees that the size will be correct
         //see: gtk_window_get_size doc for more context.
