@@ -751,51 +751,58 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | StructureNotifyMask
                | ResizeRedirectMask
                | SubstructureNotifyMask
-               | SubstructureRedirectMask
+//               | SubstructureRedirectMask
                | FocusChangeMask
                | PropertyChangeMask
                | ColormapChangeMask
                | OwnerGrabButtonMask;
 
-//    gdk_window_set_events(gdk_window, GDK_FILTERED_EVENTS_MASK);
-//TODO: keep display
     display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
-//    XMatchVisualInfo(display, DefaultScreen(display), 32, TrueColor, &vinfo);
+    visual = DefaultVisual(display, DefaultScreen(display));
     glong xvisualID = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
 
+    XVisualInfo* vinfo;
+    XVisualInfo vinfo_template;
+    unsigned int depth = DefaultDepth(display, DefaultScreen(display));
+    int visual_info_n = 0;
     if (xvisualID != 0) {
-//        GdkVisual *visual = gdk_x11_screen_lookup_visual(gdk_screen_get_default(), xvisualID);
-//        glass_gtk_window_configure_from_visual(gtk_widget, visual);
-//        gtk_widget_set_colormap (widget, colormap);
+        vinfo_template.visualid = xvisualID;
+        vinfo = XGetVisualInfo(display, VisualIDMask, &vinfo_template, &visual_info_n);
+
+        if (visual_info_n > 0) {
+            visual = vinfo[0].visual;
+            depth = vinfo[0].depth;
+        }
+        XFree(vinfo);
     }
 
-//    XSetWindowAttributes attr;
-//    //TODO colormap has visualId
-//    attr.colormap = XCreateColormap(display, DefaultRootWindow(display), vinfo.visual, AllocNone);
-//    attr.border_pixel = 0;
-//    attr.background_pixel = (frame_type == TRANSPARENT)
-//                                ? 0x00000000
-//                                : XWhitePixel(display, XDefaultScreen(display));
+    XSetWindowAttributes attr;
+    attr.colormap = XCreateColormap(display, DefaultRootWindow(display), visual, AllocNone);
+    attr.border_pixel = 0;
+    attr.background_pixel = (frame_type == TRANSPARENT)
+                                ? 0x00000000
+                                : XWhitePixel(display, DefaultScreen(display));
+    attr.override_redirect = 1;
 
-//    xwindow = XCreateWindow(display, DefaultRootWindow(display), 0, 0,
-//                            200, 200, 0, vinfo.depth, InputOutput, vinfo.visual,
-//                            CWColormap | CWBorderPixel | CWBackPixel, &attr);
-
-    unsigned long bg = (frame_type == TRANSPARENT)
-                         ? 0x00000000
-                         : XWhitePixel(display, XDefaultScreen(display));
-
-    xwindow =  XCreateSimpleWindow(display, DefaultRootWindow(display), 0, 0, 200, 200, 0, 0, bg);
+    xwindow = XCreateWindow(display, DefaultRootWindow(display), 0, 0,
+                            200, 200, 0, depth, InputOutput, visual,
+                            CWOverrideRedirect | CWColormap | CWBorderPixel | CWBackPixel, &attr);
+//CWOverrideRedirect
+//    unsigned long bg = (frame_type == TRANSPARENT)
+//                         ? 0x00000000
+//                         : XWhitePixel(display, XDefaultScreen(display));
+//
+//    xwindow =  XCreateSimpleWindow(display, DefaultRootWindow(display), 0, 0, 200, 200, 0, 0, bg);
 
     g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
     if (XSaveContext(display, xwindow, X_CONTEXT, XPointer(this)) != 0) {
         g_print("Fail to save context\n");
     }
 
-    XWindowAttributes xattr;
-    if (XGetWindowAttributes(display, xwindow, &xattr)) {
-        visual = xattr.visual;
-    }
+//    XWindowAttributes xattr;
+//    if (XGetWindowAttributes(display, xwindow, &xattr)) {
+//        visual = xattr.visual;
+//    }
 
     XSelectInput(display, xwindow, mask);
 
