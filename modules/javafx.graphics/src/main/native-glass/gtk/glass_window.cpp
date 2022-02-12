@@ -36,6 +36,8 @@
 #include <com_sun_glass_ui_Window_Level.h>
 
 #include <X11/extensions/shape.h>
+#include <X11/Xatom.h>
+
 #include <cairo.h>
 #include <cairo-xlib.h>
 #include <gdk/gdkx.h>
@@ -155,6 +157,7 @@ void WindowContextBase::process_focus(XFocusChangeEvent* event) {
 
     if (jwindow) {
         if (!in || isEnabled()) {
+            g_print("jWindowNotifyFocus\n");
             mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus,
                         in ? com_sun_glass_events_WindowEvent_FOCUS_GAINED : com_sun_glass_events_WindowEvent_FOCUS_LOST);
             CHECK_JNI_EXCEPTION(mainEnv)
@@ -248,7 +251,7 @@ void WindowContextBase::process_expose(GdkEventExpose* event) {
 
 void WindowContextBase::process_expose(XExposeEvent* event) {
     if (jview) {
-        g_print("process_expose %d, %d, %d, %d\n", event->x, event->y, event->width, event->height);
+        g_print("jViewNotifyRepaint %d, %d, %d, %d\n", event->x, event->y, event->width, event->height);
         mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->x, event->y, event->width, event->height);
         CHECK_JNI_EXCEPTION(mainEnv)
     }
@@ -537,9 +540,7 @@ void WindowContextBase::process_key(GdkEventKey* event) {
 
 void WindowContextBase::paint(void* data, jint width, jint height) {
     g_print("Paint\n");
-    XImage* image = XCreateImage(display, visual, DefaultDepth(display, DefaultScreen(display)),
-                                 ZPixmap, 0, (char*) data, width, height, 32, 0);
-
+    XImage* image = XCreateImage(display, visual, depth, ZPixmap, 0, (char*) data, width, height, 32, 0);
     XPutImage(display, xwindow, DefaultGC(display, 0), image, 0, 0, 0, 0, width, height);
 
     XDestroyImage(image);
@@ -752,7 +753,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | StructureNotifyMask
 //               | ResizeRedirectMask
                | SubstructureNotifyMask
-//               | SubstructureRedirectMask
+               | SubstructureRedirectMask
                | FocusChangeMask
                | PropertyChangeMask;
 //               | ColormapChangeMask
@@ -764,7 +765,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
     XVisualInfo* vinfo;
     XVisualInfo vinfo_template;
-    unsigned int depth = DefaultDepth(display, DefaultScreen(display));
+    depth = DefaultDepth(display, DefaultScreen(display));
     int visual_info_n = 0;
     if (xvisualID != 0) {
         vinfo_template.visualid = xvisualID;
@@ -783,19 +784,39 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     attr.background_pixel = (frame_type == TRANSPARENT)
                                 ? 0x00000000
                                 : WhitePixel(display, DefaultScreen(display));
-    attr.override_redirect = (type == POPUP) ? True : False;
+//    attr.override_redirect = (type == POPUP) ? True : False;
     attr.bit_gravity = NorthWestGravity;
     attr.event_mask = mask;
 
+    //TODO: child windows
     xwindow = XCreateWindow(display, DefaultRootWindow(display), 0, 0,
-                            200, 200, 0, depth, InputOutput, visual,
-                            CWEventMask | /*CWOverrideRedirect |*/ CWBitGravity |
+                            1, 1, 0, depth, InputOutput, visual,
+                            CWEventMask /* | CWOverrideRedirect*/ | CWBitGravity |
                             CWColormap | CWBorderPixel | CWBackPixel, &attr);
 
     g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
     if (XSaveContext(display, xwindow, X_CONTEXT, XPointer(this)) != 0) {
         g_print("Fail to save context\n");
     }
+
+    Atom type_atom;
+    switch (type) {
+        case UTILITY:
+            type_atom = XInternAtom(display, "_NET_WM_WINDOW_TYPE_UTILITY", true);
+            break;
+        case POPUP:
+            type_atom = XInternAtom(display, " _NET_WM_WINDOW_TYPE_POPUP_MENU", true);
+            break;
+        case NORMAL:
+        default:
+            XChangeProperty(display, xwindow, XInternAtom(display, "WM_CLIENT_LEADER", true),
+                            XA_WINDOW, 32, PropModeReplace, (unsigned char *) &xwindow, 1);
+            type_atom = XInternAtom(display, "_NET_WM_WINDOW_TYPE_NORMAL", true);
+            break;
+    }
+
+    XChangeProperty(display, xwindow, XInternAtom(display, "_NET_WM_WINDOW_TYPE", true),
+                   XA_ATOM, 32, PropModeReplace, (unsigned char *) &type_atom, 1);
 
     //TODO: remove
     gtk_widget = gtk_window_new(type == POPUP ? GTK_WINDOW_POPUP : GTK_WINDOW_TOPLEVEL);
@@ -816,13 +837,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
         }
     }
 
-    if (type == UTILITY) {
-        gtk_window_set_type_hint(GTK_WINDOW(gtk_widget), GDK_WINDOW_TYPE_HINT_UTILITY);
-    }
-
-//    gtk_widget_set_size_request(gtk_widget, 0, 0);
-//    gtk_widget_set_events(gtk_widget, GDK_FILTERED_EVENTS_MASK);
-//    gtk_widget_set_app_paintable(gtk_widget, TRUE);
     if (frame_type != TITLED) {
 //TODO:
 //        Hints hints;
@@ -1097,7 +1111,6 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
 
 //    if (gtk_window_get_decorated(GTK_WINDOW(gtk_widget))) {
     //TODO
-//    if (true) {
 //        GdkRectangle frame;
 //        gint top, left, bottom, right;
 //
@@ -1128,6 +1141,7 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
         w = event->width;
         h = event->height;
 //    }
+    g_print("process_configure: %d, %d, %d, %d\n", x, y, w, h);
 
     if (size_assigned && w <= 1 && h <= 1 && (geometry.final_width.value > 1 ||
                                              geometry.final_height.value > 1)) {
@@ -1147,6 +1161,7 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
     geometry_set_window_y(&geometry, y);
 
     if (jview) {
+        g_print("jViewNotifyResize\n");
         mainEnv->CallVoidMethod(jview, jViewNotifyResize,
                 event->width,
                 event->height);
@@ -1155,7 +1170,10 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
                 com_sun_glass_events_ViewEvent_MOVE);
         CHECK_JNI_EXCEPTION(mainEnv)
     }
+
     if (jwindow) {
+        g_print("jWindowNotifyResize -> %d,%d\n", geometry.current_width, geometry.current_height);
+
         mainEnv->CallVoidMethod(jwindow, jWindowNotifyResize,
                 (is_maximized)
                     ? com_sun_glass_events_WindowEvent_MAXIMIZE
@@ -1210,25 +1228,10 @@ void WindowContextTop::update_window_constraints() {
 
         hints->flags = (PMinSize | PMaxSize);
 
-        //FIXME: maybe XSetWMSizeHints?
-        g_print("XSetWMNormalHints: constraints\n");
-        XSetWMNormalHints(display, xwindow, hints);
+        g_print("XSetNormalHints: constraints\n");
+        XSetNormalHints(display, xwindow, hints);
 
         XFree(hints);
-
-//        GdkGeometry geom = {
-//            (resizable.minw == -1) ? 1
-//                    : resizable.minw - geometry.extents.left - geometry.extents.right,
-//            (resizable.minh == -1) ? 1
-//                    : resizable.minh - geometry.extents.top - geometry.extents.bottom,
-//            (resizable.maxw == -1) ? 100000
-//                    : resizable.maxw - geometry.extents.left - geometry.extents.right,
-//            (resizable.maxh == -1) ? 100000
-//                    : resizable.maxh - geometry.extents.top - geometry.extents.bottom,
-//            0, 0, 0, 0, 0.0, 0.0, GDK_GRAVITY_NORTH_WEST
-//        };
-//        gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom,
-//                static_cast<GdkWindowHints> (GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE));
     }
 }
 
@@ -1253,15 +1256,8 @@ void WindowContextTop::set_window_resizable(bool res) {
         hints->max_height = h;
         hints->flags = (PMinSize | PMaxSize);
 
-        //FIXME: maybe XSetWMSizeHints?
-        g_print("XSetWMNormalHints: not resizable, %d, %d\n", w, h);
-        XSetWMNormalHints(display, xwindow, hints);
-
+        XSetNormalHints(display, xwindow, hints);
         XFree(hints);
-
-//        GdkGeometry geom = {w, h, w, h, 0, 0, 0, 0, 0.0, 0.0, GDK_GRAVITY_NORTH_WEST};
-//        gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom,
-//                static_cast<GdkWindowHints>(GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE));
         resizable.value = false;
     } else {
         resizable.value = true;
@@ -1295,6 +1291,7 @@ void WindowContextTop::set_visible(bool visible)
     WindowContextBase::set_visible(visible);
     //JDK-8220272 - fire event first because GDK_FOCUS_CHANGE is not always in order
     if (visible && jwindow && isEnabled()) {
+        g_print("jWindowNotifyFocus -> com_sun_glass_events_WindowEvent_FOCUS_GAINED\n");
         mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus, com_sun_glass_events_WindowEvent_FOCUS_GAINED);
         CHECK_JNI_EXCEPTION(mainEnv);
     }
@@ -1400,8 +1397,9 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         if (windowChangesMask & CWY) {
             newY = windowChanges->y;
         }
-    }
 
+        g_print("newX %d, newY %d\n", newX, newY);
+    }
 
     int newWidth, newHeight;
     if (windowChangesMask & (CWWidth | CWHeight)) {
@@ -1424,19 +1422,19 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
 //            gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom, hints);
         }
 
+        g_print("newWidth %d, newHeight %d\n", newWidth, newHeight);
     }
+
+    g_print("XConfigureWindow %d, %d, %d, %d\n", windowChanges->x, windowChanges->y,
+            windowChanges->width, windowChanges->height);
 
     XConfigureWindow(display, xwindow, windowChangesMask, windowChanges);
 
-    if (windowChangesMask & (CWWidth | CWHeight)) {
-        //JDK-8193502: Moved here from WindowContextBase::set_view because set_view is called
-        //first and the size is not set yet. This also guarantees that the size will be correct
-        //see: gtk_window_get_size doc for more context.
-        if (jview) {
-            mainEnv->CallVoidMethod(jview, jViewNotifyResize, newWidth, newHeight);
-            CHECK_JNI_EXCEPTION(mainEnv);
-        }
-    }
+    //XReconfigureWMWindow(display, xwindow, DefaultScreen(display), windowChangesMask, windowChanges);
+//    if (windowChangesMask & (CWWidth | CWHeight) && jview) {
+//        mainEnv->CallVoidMethod(jview, jViewNotifyResize, newWidth, newHeight);
+//        CHECK_JNI_EXCEPTION(mainEnv);
+//    }
 }
 
 void WindowContextTop::applyShapeMask(void* data, uint width, uint height)
@@ -1512,7 +1510,8 @@ void WindowContextTop::request_focus() {
     //The WindowContextBase::set_visible will take care of showing the window.
     //The below code will only handle later request_focus.
     if (is_visible()) {
-        gtk_window_present(GTK_WINDOW(gtk_widget));
+        XRaiseWindow(display, xwindow);
+//        gtk_window_present(GTK_WINDOW(gtk_widget));
     }
 }
 

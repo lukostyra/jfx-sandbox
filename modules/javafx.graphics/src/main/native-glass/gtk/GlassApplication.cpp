@@ -132,6 +132,10 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
     while (XPending(display)) {
         XNextEvent(display, &xevent);
 
+        if (xevent.xany.window == DefaultRootWindow(display)) {
+            g_print("============> Root Window Event %d\n", xevent.type);
+        }
+
         if (XFindContext(display, xevent.xany.window, X_CONTEXT, (XPointer *) &ctx) != 0) {
 //            g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
             continue;
@@ -182,6 +186,8 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                     g_print("X11 Xssing\n");
                     ctx->process_mouse_cross(&xevent.xcrossing);
                     break;
+                default:
+                    XFilterEvent(&xevent, None);
             }
         } catch (jni_exception&) {
         }

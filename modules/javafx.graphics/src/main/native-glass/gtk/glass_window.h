@@ -196,6 +196,7 @@ protected:
     Window xwindow;
     Display* display;
     Visual* visual;
+    unsigned int depth;
 
     GdkWMFunction gdk_windowManagerFunctions;
 
