@@ -759,7 +759,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | ButtonMotionMask
 //               | KeymapStateMask
                | ExposureMask
-               | VisibilityChangeMask
+//               | VisibilityChangeMask
                | StructureNotifyMask
 //               | ResizeRedirectMask
                | SubstructureNotifyMask
@@ -805,7 +805,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                             CWEventMask /* | CWOverrideRedirect*/ | CWBitGravity |
                             CWColormap | CWBorderPixel | CWBackPixel, &attr);
 
-    g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
+//    g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
     if (XSaveContext(display, xwindow, X_CONTEXT, XPointer(this)) != 0) {
         g_print("Fail to save context\n");
     }
