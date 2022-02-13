@@ -146,7 +146,6 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
 //            continue;
 //        }
 
-        g_print("Event %d\n", xevent.type);
         EventsCounterHelper helper(ctx);
         try {
             switch (xevent.type) {
@@ -191,6 +190,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                     ctx->process_mouse_cross(&xevent.xcrossing);
                     break;
                 default:
+                    g_print("Event NOT HANDLED %d\n", xevent.type);
                     XFilterEvent(&xevent, None);
             }
         } catch (jni_exception&) {

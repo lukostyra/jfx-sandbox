@@ -800,7 +800,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
     //TODO: child windows
     xparent = DefaultRootWindow(display);
-    xwindow = XCreateWindow(display, xparent, 0, 0,
+    xwindow = XCreateWindow(display, xparent, 1, 1,
                             1, 1, 0, depth, InputOutput, visual,
                             CWEventMask /* | CWOverrideRedirect*/ | CWBitGravity |
                             CWColormap | CWBorderPixel | CWBackPixel, &attr);
@@ -848,16 +848,18 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
         }
     }
 
+    MwmHints hints;
+    hints.functions = wmf;
+    hints.flags = MWM_HINTS_FUNCTIONS;
+
     if (frame_type != TITLED) {
-//TODO:
-//        Hints hints;
-//        Atom property;
-//        hints.flags = 2;
-//        hints.decorations = 0;
-//        property = XInternAtom(display, "_MOTIF_WM_HINTS", true);
-//        XChangeProperty(display, xwindow, property, property, 32, PropModeReplace,(unsigned char *)&hints, 5);
-//        gtk_window_set_decorated(GTK_WINDOW(gtk_widget), FALSE);
+        hints.decorations = 0;
+        hints.flags |= MWM_HINTS_DECORATIONS;
     }
+
+    Atom motif_atom = XInternAtom(display, "_MOTIF_WM_HINTS", true);
+    XChangeProperty(display, xwindow, motif_atom, motif_atom, 32,
+                    PropModeReplace, (unsigned char *)&hints, sizeof (MwmHints)/sizeof (long));
 
     glass_gtk_configure_transparency_and_realize(gtk_widget, frame_type == TRANSPARENT);
 //    gtk_window_set_title(GTK_WINDOW(gtk_widget), "");

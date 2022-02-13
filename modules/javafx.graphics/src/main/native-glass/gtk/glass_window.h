@@ -36,6 +36,12 @@
 
 #include "glass_view.h"
 
+#define MWM_HINTS_FUNCTIONS     (1L << 0)
+#define MWM_HINTS_DECORATIONS   (1L << 1)
+#define MWM_HINTS_INPUT_MODE    (1L << 2)
+#define MWM_HINTS_STATUS        (1L << 3)
+
+
 enum WindowFrameType {
     TITLED,
     UNTITLED,
@@ -53,6 +59,14 @@ enum request_type {
     REQUEST_RESIZABLE,
     REQUEST_NOT_RESIZABLE
 };
+
+typedef struct {
+    unsigned long flags;
+    unsigned long functions;
+    unsigned long decorations;
+    long input_mode;
+    unsigned long status;
+} MwmHints;
 
 struct WindowFrameExtents {
     int top;
