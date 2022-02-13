@@ -25,6 +25,7 @@
 
 //#include <X11/Xlib.h>
 //#include <X11/Xatom.h>
+#include <X11/extensions/Xdamage.h>
 #include <X11/Xresource.h>
 #include <gdk/gdk.h>
 #include <gdk/gdkx.h>
@@ -132,9 +133,9 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
     while (XPending(display)) {
         XNextEvent(display, &xevent);
 
-        if (xevent.xany.window == DefaultRootWindow(display)) {
-            g_print("============> Root Window Event %d\n", xevent.type);
-        }
+//        if (xevent.xany.window == DefaultRootWindow(display)) {
+//            g_print("============> Root Window Event %d\n", xevent.type);
+//        }
 
         if (XFindContext(display, xevent.xany.window, X_CONTEXT, (XPointer *) &ctx) != 0) {
 //            g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
@@ -149,9 +150,9 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
         EventsCounterHelper helper(ctx);
         try {
             switch (xevent.type) {
-                case ConfigureRequest:
-                    g_print("============> X11 Configure Request\n");
-                    break;
+//                case ConfigureRequest:
+//                    g_print("============> X11 Configure Request\n");
+//                    break;
                 case ConfigureNotify:
                     g_print("X11 Configure\n");
                     ctx->process_configure(&xevent.xconfigure);
@@ -168,6 +169,9 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                 case Expose:
                     g_print("X11 Expose\n");
                     ctx->process_expose(&xevent.xexpose);
+                    break;
+                case XDamageNotify:
+                    ctx->process_damage((XDamageNotifyEvent*)&xevent);
                     break;
                 case KeyPress:
                 case KeyRelease:

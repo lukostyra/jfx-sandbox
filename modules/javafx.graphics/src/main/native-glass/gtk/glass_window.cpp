@@ -35,8 +35,10 @@
 
 #include <com_sun_glass_ui_Window_Level.h>
 
+
 #include <X11/extensions/shape.h>
 #include <X11/Xatom.h>
+#include <X11/extensions/Xdamage.h>
 
 #include <cairo.h>
 #include <cairo-xlib.h>
@@ -253,6 +255,14 @@ void WindowContextBase::process_expose(XExposeEvent* event) {
     if (jview) {
         g_print("jViewNotifyRepaint %d, %d, %d, %d\n", event->x, event->y, event->width, event->height);
         mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->x, event->y, event->width, event->height);
+        CHECK_JNI_EXCEPTION(mainEnv)
+    }
+}
+
+void WindowContextBase::process_damage(XDamageNotifyEvent* event) {
+    if (jview) {
+        g_print("DAMAGE: jViewNotifyRepaint %d, %d, %d, %d\n", event->area.x, event->area.y, event->area.width, event->area.height);
+        mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->area.x, event->area.y, event->area.width, event->area.height);
         CHECK_JNI_EXCEPTION(mainEnv)
     }
 }
@@ -753,7 +763,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | StructureNotifyMask
 //               | ResizeRedirectMask
                | SubstructureNotifyMask
-               | SubstructureRedirectMask
+//               | SubstructureRedirectMask
                | FocusChangeMask
                | PropertyChangeMask;
 //               | ColormapChangeMask
@@ -789,7 +799,8 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     attr.event_mask = mask;
 
     //TODO: child windows
-    xwindow = XCreateWindow(display, DefaultRootWindow(display), 0, 0,
+    xparent = DefaultRootWindow(display);
+    xwindow = XCreateWindow(display, xparent, 0, 0,
                             1, 1, 0, depth, InputOutput, visual,
                             CWEventMask /* | CWOverrideRedirect*/ | CWBitGravity |
                             CWColormap | CWBorderPixel | CWBackPixel, &attr);
@@ -1386,6 +1397,12 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         return;
     }
 
+//    XWindowAttributes parent_attr;
+//    if (!XGetWindowAttributes(display, xparent, &parent_attr)) {
+//        g_print("XGetWindowAttributes FAIL!\n");
+//        return;
+//    }
+
     if (windowChangesMask & (CWX | CWY)) {
         int newX, newY;
         newX = xattr.x;
@@ -1397,6 +1414,9 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         if (windowChangesMask & CWY) {
             newY = windowChanges->y;
         }
+
+//        newX += parent_attr.x;
+//        newY += parent_attr.y;
 
         g_print("newX %d, newY %d\n", newX, newY);
     }

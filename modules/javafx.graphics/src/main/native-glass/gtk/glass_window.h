@@ -28,6 +28,7 @@
 #include <gtk/gtk.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/extensions/Xdamage.h>
 
 #include <jni.h>
 #include <set>
@@ -149,6 +150,7 @@ public:
     virtual void process_delete() = 0;
     virtual void process_expose(GdkEventExpose*) = 0;
     virtual void process_expose(XExposeEvent *) = 0;
+    virtual void process_damage(XDamageNotifyEvent *) = 0;
     virtual void process_mouse_button(GdkEventButton*) = 0;
     virtual void process_mouse_motion(GdkEventMotion*) = 0;
     virtual void process_mouse_motion(XMotionEvent *) = 0;
@@ -194,6 +196,7 @@ protected:
     GtkWidget* gtk_widget;
     GdkWindow* gdk_window;
     Window xwindow;
+    Window xparent;
     Display* display;
     Visual* visual;
     unsigned int depth;
@@ -255,6 +258,7 @@ public:
     void process_delete();
     void process_expose(GdkEventExpose*);
     void process_expose(XExposeEvent *);
+    void process_damage(XDamageNotifyEvent *);
     void process_mouse_button(GdkEventButton*);
     void process_mouse_motion(GdkEventMotion*);
     void process_mouse_motion(XMotionEvent*);
