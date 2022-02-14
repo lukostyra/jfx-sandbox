@@ -879,9 +879,9 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 //        gdk_window_set_functions(gdk_window, wmf);
 //    }
 //
-//    if (frame_type == TITLED) {
-//        request_frame_extents();
-//    }
+    if (frame_type == TITLED) {
+        request_frame_extents();
+    }
 }
 
 // Applied to a temporary full screen window to prevent sending events to Java
@@ -898,26 +898,23 @@ void WindowContextTop::detach_from_java() {
 
 
 
-/*
-void
-WindowContextTop::request_frame_extents() {
-    Display *display = GDK_DISPLAY_XDISPLAY(gdk_window_get_display(gdk_window));
+void WindowContextTop::request_frame_extents() {
     Atom rfeAtom = XInternAtom(display, "_NET_REQUEST_FRAME_EXTENTS", True);
     if (rfeAtom != None) {
         XClientMessageEvent clientMessage;
         memset(&clientMessage, 0, sizeof(clientMessage));
 
         clientMessage.type = ClientMessage;
-        clientMessage.window = GDK_WINDOW_XID(gdk_window);
+        clientMessage.window = xwindow;
         clientMessage.message_type = rfeAtom;
         clientMessage.format = 32;
 
-        XSendEvent(display, XDefaultRootWindow(display), False,
+        XSendEvent(display, DefaultRootWindow(display), False,
                    SubstructureRedirectMask | SubstructureNotifyMask,
                    (XEvent *) &clientMessage);
         XFlush(display);
     }
-}*/
+}
 
 void WindowContextTop::activate_window() {
     Display *display = GDK_DISPLAY_XDISPLAY (gdk_window_get_display (gdk_window));
@@ -956,6 +953,8 @@ WindowFrameExtents WindowContextTop::get_cached_extents() {
 
 bool WindowContextTop::update_frame_extents() {
     g_print("update_frame_extents\n");
+
+    //TODO: cache
     Atom frame_extents_atom = XInternAtom(display, "_NET_FRAME_EXTENTS", True);
     bool changed = false;
     int top, left, bottom, right;
@@ -1101,10 +1100,13 @@ void WindowContextTop::process_net_wm_property() {
 }
 
 void WindowContextTop::process_property(XPropertyEvent* event) {
-    if (event->state == PropertyNewValue) {
-
+    Atom frame_extents_atom = XInternAtom(display, "_NET_FRAME_EXTENTS", True);
+    if (event->state == PropertyNewValue && event->window == xwindow) {
+        if (event->atom == frame_extents_atom) {
+            g_print("Got frame extents!!!!!!!!!\n");
+            update_frame_extents();
+        }
     }
-
 }
 
 void WindowContextTop::process_property_notify(GdkEventProperty* event) {

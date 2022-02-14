@@ -381,7 +381,7 @@ protected:
     void applyShapeMask(void*, uint width, uint height);
 private:
     bool get_frame_extents_property(int *, int *, int *, int *);
-//    void request_frame_extents();
+    void request_frame_extents();
     void activate_window();
     bool update_frame_extents();
     void set_cached_extents(WindowFrameExtents ex);
