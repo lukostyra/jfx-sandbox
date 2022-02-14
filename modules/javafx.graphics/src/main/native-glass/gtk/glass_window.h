@@ -161,6 +161,7 @@ public:
     virtual void set_background(float, float, float) = 0;
 
     virtual void process_property_notify(GdkEventProperty*) = 0;
+    virtual void process_property(XPropertyEvent*) = 0;
     virtual void process_configure(GdkEventConfigure*) = 0;
     virtual void process_configure(XConfigureEvent*) = 0;
     virtual void process_map() = 0;
@@ -189,6 +190,7 @@ public:
 
     virtual GdkWindow *get_gdk_window() = 0;
     virtual GtkWindow *get_gtk_window() = 0;
+    virtual XID get_window_xid() = 0;
     virtual jobject get_jview() = 0;
     virtual jobject get_jwindow() = 0;
 
@@ -253,6 +255,7 @@ public:
     void disableIME();
     void paint(void*, jint, jint);
     GdkWindow *get_gdk_window();
+    XID get_window_xid();
     jobject get_jwindow();
     jobject get_jview();
 
@@ -340,6 +343,7 @@ public:
     WindowContextTop(jobject, WindowContext*, long, WindowFrameType, WindowType, int);
     void process_map();
     void process_property_notify(GdkEventProperty*);
+    void process_property(XPropertyEvent*);
     void process_configure(GdkEventConfigure*);
     void process_configure(XConfigureEvent*);
     void process_destroy();
@@ -377,7 +381,7 @@ protected:
     void applyShapeMask(void*, uint width, uint height);
 private:
     bool get_frame_extents_property(int *, int *, int *, int *);
-    void request_frame_extents();
+//    void request_frame_extents();
     void activate_window();
     bool update_frame_extents();
     void set_cached_extents(WindowFrameExtents ex);

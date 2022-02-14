@@ -156,6 +156,10 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                     g_print("X11 Configure\n");
                     ctx->process_configure(&xevent.xconfigure);
                     break;
+                case PropertyNotify:
+                    g_print("X11 Property Notify");
+                    ctx->process_property(&xevent.xproperty);
+                    break;
                 case MapNotify:
                     g_print("X11 MAP\n");
                     ctx->process_map();

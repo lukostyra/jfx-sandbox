@@ -539,6 +539,7 @@ JNIEXPORT jboolean JNICALL Java_com_sun_glass_ui_gtk_GtkWindow_isVisible
     WindowContext* ctx = JLONG_TO_WINDOW_CTX(ptr);
     return ctx->is_visible() ? JNI_TRUE : JNI_FALSE;
 }
+
 JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkWindow__1getNativeWindowImpl
     (JNIEnv * env, jobject obj, jlong ptr)
 {
@@ -546,7 +547,7 @@ JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkWindow__1getNativeWindowImp
     (void)obj;
 
     WindowContext* ctx = JLONG_TO_WINDOW_CTX(ptr);
-    return GDK_WINDOW_XID(ctx->get_gdk_window());
+    return ctx->get_window_xid();
 }
 /*
  * Class:     com_sun_glass_ui_gtk_GtkWindow

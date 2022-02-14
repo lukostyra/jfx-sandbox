@@ -62,6 +62,10 @@ GdkWindow* WindowContextBase::get_gdk_window(){
     return gdk_window;
 }
 
+XID WindowContextBase::get_window_xid() {
+    return xwindow;
+}
+
 jobject WindowContextBase::get_jview() {
     return jview;
 }
@@ -892,12 +896,9 @@ void WindowContextTop::detach_from_java() {
     }
 }
 
-static GdkAtom
-get_net_frame_extents_atom() {
-    static const char * extents_str = "_NET_FRAME_EXTENTS";
-    return gdk_atom_intern(extents_str, TRUE);
-}
 
+
+/*
 void
 WindowContextTop::request_frame_extents() {
     Display *display = GDK_DISPLAY_XDISPLAY(gdk_window_get_display(gdk_window));
@@ -916,7 +917,7 @@ WindowContextTop::request_frame_extents() {
                    (XEvent *) &clientMessage);
         XFlush(display);
     }
-}
+}*/
 
 void WindowContextTop::activate_window() {
     Display *display = GDK_DISPLAY_XDISPLAY (gdk_window_get_display (gdk_window));
@@ -954,51 +955,43 @@ WindowFrameExtents WindowContextTop::get_cached_extents() {
 
 
 bool WindowContextTop::update_frame_extents() {
+    g_print("update_frame_extents\n");
+    Atom frame_extents_atom = XInternAtom(display, "_NET_FRAME_EXTENTS", True);
     bool changed = false;
     int top, left, bottom, right;
-    if (get_frame_extents_property(&top, &left, &bottom, &right)) {
-        changed = geometry.extents.top != top
-                    || geometry.extents.left != left
-                    || geometry.extents.bottom != bottom
-                    || geometry.extents.right != right;
-        if (changed) {
-            geometry.extents.top = top;
-            geometry.extents.left = left;
-            geometry.extents.bottom = bottom;
-            geometry.extents.right = right;
-            if (!is_null_extents()) {
-                set_cached_extents(geometry.extents);
+
+    Atom type_return;
+    unsigned long nitems_return;
+    unsigned long bytes_after_return;
+    int format_return;
+    unsigned char* data;
+
+    if (XGetWindowProperty(display, xwindow, frame_extents_atom, 0, G_MAXLONG, False, XA_CARDINAL, &type_return,
+                            &format_return, &nitems_return, &bytes_after_return, &data) == Success) {
+        if ((type_return == XA_CARDINAL) && (format_return == 32) && (nitems_return == 4) && (data)) {
+            top = data[0];
+            left = data[1];
+            bottom = data[2];
+            right = data[3];
+
+            g_print("Frame extents: %d, %d, %d, %d\n", top, left, bottom, right);
+
+            changed = geometry.extents.top != top
+                        || geometry.extents.left != left
+                        || geometry.extents.bottom != bottom
+                        || geometry.extents.right != right;
+            if (changed) {
+                geometry.extents.top = top;
+                geometry.extents.left = left;
+                geometry.extents.bottom = bottom;
+                geometry.extents.right = right;
+                if (!is_null_extents()) {
+                    set_cached_extents(geometry.extents);
+                }
             }
         }
     }
     return changed;
-}
-
-bool
-WindowContextTop::get_frame_extents_property(int *top, int *left,
-        int *bottom, int *right) {
-    unsigned long *extents;
-
-    if (gdk_property_get(gdk_window,
-            get_net_frame_extents_atom(),
-            gdk_atom_intern("CARDINAL", FALSE),
-            0,
-            sizeof (unsigned long) * 4,
-            FALSE,
-            NULL,
-            NULL,
-            NULL,
-            (guchar**) & extents)) {
-        *left = extents [0];
-        *right = extents [1];
-        *top = extents [2];
-        *bottom = extents [3];
-
-        g_free(extents);
-        return true;
-    }
-
-    return false;
 }
 
 static int geometry_get_window_width(const WindowGeometry *windowGeometry) {
@@ -1107,6 +1100,13 @@ void WindowContextTop::process_net_wm_property() {
     }
 }
 
+void WindowContextTop::process_property(XPropertyEvent* event) {
+    if (event->state == PropertyNewValue) {
+
+    }
+
+}
+
 void WindowContextTop::process_property_notify(GdkEventProperty* event) {
     static GdkAtom atom_net_wm_state = gdk_atom_intern_static_string("_NET_WM_STATE");
 
@@ -1122,38 +1122,40 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
     int x, y, w, h;
     bool updateWindowConstraints = false;
 
-//    if (gtk_window_get_decorated(GTK_WINDOW(gtk_widget))) {
-    //TODO
-//        GdkRectangle frame;
-//        gint top, left, bottom, right;
-//
-//        gdk_window_get_frame_extents(gdk_window, &frame);
-//#ifdef GLASS_GTK3
-//        gdk_window_get_geometry(gdk_window, NULL, NULL, &w, &h);
-//#else
-//        gdk_window_get_geometry(gdk_window, NULL, NULL, &w, &h, NULL);
-//#endif
-//        x = frame.x;
-//        y = frame.y;
-//        geometry.current_width = frame.width;
-//        geometry.current_height = frame.height;
-//
-//        if (update_frame_extents()) {
-//            updateWindowConstraints = true;
-//            if (!frame_extents_initialized && !is_null_extents()) {
-//                frame_extents_initialized = true;
-//                set_bounds(0, 0, false, false,
-//                    requested_bounds.width, requested_bounds.height,
-//                    requested_bounds.client_width, requested_bounds.client_height
-//                );
-//            }
-//        }
-//    } else {
+
+    if (frame_type == TITLED) {
+        Window root;
+        Window child;
+        unsigned int ww, wh, wb, wd;
+        int wx, wy;
+
+        //TODO: may fail
+        XGetGeometry(display, xwindow, &root, &wx, &wy, &ww, &wh, &wb, &wd);
+        XTranslateCoordinates(display, xwindow, root, 0, 0, &wx, &wy, &child);
+
+        x = wx;
+        y = wy;
+        w = ww;
+        h = wh;
+        geometry.current_width = ww;
+        geometry.current_height = wh;
+
+        if (update_frame_extents()) {
+            updateWindowConstraints = true;
+            if (!frame_extents_initialized && !is_null_extents()) {
+                frame_extents_initialized = true;
+                set_bounds(0, 0, false, false,
+                    requested_bounds.width, requested_bounds.height,
+                    requested_bounds.client_width, requested_bounds.client_height
+                );
+            }
+        }
+    } else {
         x = event->x;
         y = event->y;
         w = event->width;
         h = event->height;
-//    }
+    }
     g_print("process_configure: %d, %d, %d, %d\n", x, y, w, h);
 
     if (size_assigned && w <= 1 && h <= 1 && (geometry.final_width.value > 1 ||
@@ -1399,12 +1401,6 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         return;
     }
 
-//    XWindowAttributes parent_attr;
-//    if (!XGetWindowAttributes(display, xparent, &parent_attr)) {
-//        g_print("XGetWindowAttributes FAIL!\n");
-//        return;
-//    }
-
     if (windowChangesMask & (CWX | CWY)) {
         int newX, newY;
         newX = xattr.x;
@@ -1417,14 +1413,16 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
             newY = windowChanges->y;
         }
 
-//        newX += parent_attr.x;
-//        newY += parent_attr.y;
-
         g_print("newX %d, newY %d\n", newX, newY);
+
+//        Window child;
+//        XTranslateCoordinates(display, xwindow, DefaultRootWindow(display), 0, 0, &windowChanges->x, &windowChanges->y, &child);
+//
+//        g_print("Translated newX %d, newY %d\n", windowChanges->x, windowChanges->y);
     }
 
-    int newWidth, newHeight;
     if (windowChangesMask & (CWWidth | CWHeight)) {
+        int newWidth, newHeight;
         newWidth = xattr.width;
         newHeight = xattr.height;
 
