@@ -54,20 +54,20 @@ static WindowType glass_mask_to_window_type(jint mask) {
     return NORMAL;
 }
 
-static GdkWMFunction glass_mask_to_wm_function(jint mask) {
-    int func = GDK_FUNC_RESIZE | GDK_FUNC_MOVE;
+static int glass_mask_to_wm_function(jint mask) {
+    int func = MWM_FUNC_RESIZE | MWM_FUNC_MOVE;
 
     if (mask & com_sun_glass_ui_gtk_GtkWindow_CLOSABLE) {
-        func |= GDK_FUNC_CLOSE;
+        func |= MWM_FUNC_CLOSE;
     }
     if (mask & com_sun_glass_ui_gtk_GtkWindow_MAXIMIZABLE) {
-        func |= GDK_FUNC_MAXIMIZE;
+        func |= MWM_FUNC_MAXIMIZE;
     }
     if (mask & com_sun_glass_ui_gtk_GtkWindow_MINIMIZABLE) {
-        func |= GDK_FUNC_MINIMIZE;
+        func |= MWM_FUNC_MINIMIZE;
     }
 
-    return (GdkWMFunction) func;
+    return func;
 }
 
 extern "C" {

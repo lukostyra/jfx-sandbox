@@ -36,6 +36,12 @@
 
 #include "glass_view.h"
 
+#define MWM_FUNC_RESIZE         (1L << 1)
+#define MWM_FUNC_MOVE           (1L << 2)
+#define MWM_FUNC_MINIMIZE       (1L << 3)
+#define MWM_FUNC_MAXIMIZE       (1L << 4)
+#define MWM_FUNC_CLOSE          (1L << 5)
+
 #define MWM_HINTS_FUNCTIONS     (1L << 0)
 #define MWM_HINTS_DECORATIONS   (1L << 1)
 #define MWM_HINTS_INPUT_MODE    (1L << 2)
@@ -331,7 +337,7 @@ class WindowContextTop: public WindowContextBase {
     static WindowFrameExtents normal_extents;
     static WindowFrameExtents utility_extents;
 public:
-    WindowContextTop(jobject, WindowContext*, long, WindowFrameType, WindowType, GdkWMFunction);
+    WindowContextTop(jobject, WindowContext*, long, WindowFrameType, WindowType, int);
     void process_map();
     void process_property_notify(GdkEventProperty*);
     void process_configure(GdkEventConfigure*);

@@ -725,7 +725,7 @@ WindowFrameExtents WindowContextTop::utility_extents = {28, 1, 1, 1};
 
 
 WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long _screen,
-        WindowFrameType _frame_type, WindowType type, GdkWMFunction wmf) :
+        WindowFrameType _frame_type, WindowType type, int wmf) :
             WindowContextBase(),
             screen(_screen),
             frame_type(_frame_type),
@@ -1447,8 +1447,7 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         g_print("newWidth %d, newHeight %d\n", newWidth, newHeight);
     }
 
-    g_print("XConfigureWindow %d, %d, %d, %d\n", windowChanges->x, windowChanges->y,
-            windowChanges->width, windowChanges->height);
+    g_print("XConfigureWindow\n");
 
     XConfigureWindow(display, xwindow, windowChangesMask, windowChanges);
 
