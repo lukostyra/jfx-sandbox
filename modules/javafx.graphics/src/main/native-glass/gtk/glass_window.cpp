@@ -589,6 +589,7 @@ void WindowContextBase::reparent_children(WindowContext* parent) {
 
 void WindowContextBase::set_visible(bool visible) {
     if (visible) {
+        g_print("XMapWindow\n");
         XMapWindow(display, xwindow);
 //        gtk_widget_show_all(gtk_widget);
     } else {
@@ -1243,10 +1244,12 @@ void WindowContextTop::update_window_constraints() {
         hints->max_height = (resizable.maxh == -1) ? 100000
                            : resizable.maxh - geometry.extents.top - geometry.extents.bottom;
 
-        hints->flags = (PMinSize | PMaxSize);
+//        hints->win_gravity = NorthWestGravity;
 
-        g_print("XSetNormalHints: constraints\n");
-        XSetNormalHints(display, xwindow, hints);
+        hints->flags = (PMinSize | PMaxSize); // | PWinGravity);
+
+        g_print("XSetWMNormalHints: constraints\n");
+        XSetWMNormalHints(display, xwindow, hints);
 
         XFree(hints);
     }
@@ -1273,7 +1276,7 @@ void WindowContextTop::set_window_resizable(bool res) {
         hints->max_height = h;
         hints->flags = (PMinSize | PMaxSize);
 
-        XSetNormalHints(display, xwindow, hints);
+        XSetWMNormalHints(display, xwindow, hints);
         XFree(hints);
         resizable.value = false;
     } else {
@@ -1417,11 +1420,16 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
 
         g_print("newX %d, newY %d\n", newX, newY);
 
-//        Window child;
-//        XTranslateCoordinates(display, xwindow, DefaultRootWindow(display), 0, 0, &windowChanges->x, &windowChanges->y, &child);
-//
-//        g_print("Translated newX %d, newY %d\n", windowChanges->x, windowChanges->y);
+        XSizeHints* hints = XAllocSizeHints();
+        hints->x = newX;
+        hints->y = newY;
+        hints->flags = PPosition;
+        XSetWMNormalHints(display, xwindow, hints);
+        XFree(hints);
+
+        XMoveWindow(display, xwindow, newX, newY);
     }
+
 
     if (windowChangesMask & (CWWidth | CWHeight)) {
         int newWidth, newHeight;
@@ -1445,17 +1453,15 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         }
 
         g_print("newWidth %d, newHeight %d\n", newWidth, newHeight);
+
+        XResizeWindow(display, xwindow, newWidth, newHeight);
     }
 
-    g_print("XConfigureWindow\n");
+    XSync(display, FALSE);
 
-    XConfigureWindow(display, xwindow, windowChangesMask, windowChanges);
+//    g_print("XConfigureWindow\n");
 
-    //XReconfigureWMWindow(display, xwindow, DefaultScreen(display), windowChangesMask, windowChanges);
-//    if (windowChangesMask & (CWWidth | CWHeight) && jview) {
-//        mainEnv->CallVoidMethod(jview, jViewNotifyResize, newWidth, newHeight);
-//        CHECK_JNI_EXCEPTION(mainEnv);
-//    }
+//    XConfigureWindow(display, xwindow, windowChangesMask, windowChanges);
 }
 
 void WindowContextTop::applyShapeMask(void* data, uint width, uint height)

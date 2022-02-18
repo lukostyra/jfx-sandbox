@@ -157,7 +157,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                     ctx->process_configure(&xevent.xconfigure);
                     break;
                 case PropertyNotify:
-                    g_print("X11 Property Notify");
+//                    g_print("X11 Property Notify\n");
                     ctx->process_property(&xevent.xproperty);
                     break;
                 case MapNotify:
