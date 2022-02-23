@@ -795,20 +795,20 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
     XSetWindowAttributes attr;
     attr.colormap = XCreateColormap(display, DefaultRootWindow(display), visual, AllocNone);
-    attr.border_pixel = 0;
+//    attr.border_pixel = 0;
     attr.background_pixel = (frame_type == TRANSPARENT)
                                 ? 0x00000000
                                 : WhitePixel(display, DefaultScreen(display));
-//    attr.override_redirect = (type == POPUP) ? True : False;
-    attr.bit_gravity = NorthWestGravity;
+    attr.override_redirect = (type == POPUP) ? True : False;
+    attr.win_gravity = NorthWestGravity;
     attr.event_mask = mask;
 
     //TODO: child windows
     xparent = DefaultRootWindow(display);
-    xwindow = XCreateWindow(display, xparent, 1, 1,
+    xwindow = XCreateWindow(display, xparent, 0, 0,
                             1, 1, 0, depth, InputOutput, visual,
-                            CWEventMask /* | CWOverrideRedirect*/ | CWBitGravity |
-                            CWColormap | CWBorderPixel | CWBackPixel, &attr);
+                            CWEventMask | CWOverrideRedirect | CWWinGravity |
+                            CWColormap | /*CWBorderPixel |*/ CWBackPixel, &attr);
 
 //    g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
     if (XSaveContext(display, xwindow, X_CONTEXT, XPointer(this)) != 0) {
@@ -875,11 +875,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
 //    gdk_window_register_dnd(gdk_window);
 
-//    gdk_windowManagerFunctions = wmf;
-//    if (wmf) {
-//        gdk_window_set_functions(gdk_window, wmf);
-//    }
-//
     if (frame_type == TITLED) {
         request_frame_extents();
     }
@@ -896,8 +891,6 @@ void WindowContextTop::detach_from_java() {
         jwindow = NULL;
     }
 }
-
-
 
 void WindowContextTop::request_frame_extents() {
     Atom rfeAtom = XInternAtom(display, "_NET_REQUEST_FRAME_EXTENTS", True);
@@ -1400,68 +1393,67 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         return;
     }
 
-    XWindowAttributes xattr;
-    if (!XGetWindowAttributes(display, xwindow, &xattr)) {
-        g_print("XGetWindowAttributes FAIL!\n");
-        return;
-    }
-
-    if (windowChangesMask & (CWX | CWY)) {
-        int newX, newY;
-        newX = xattr.x;
-        newY = xattr.y;
-
-        if (windowChangesMask & CWX) {
-            newX = windowChanges->x;
-        }
-        if (windowChangesMask & CWY) {
-            newY = windowChanges->y;
-        }
-
-        g_print("newX %d, newY %d\n", newX, newY);
-
-        XSizeHints* hints = XAllocSizeHints();
-        hints->x = newX;
-        hints->y = newY;
-        hints->flags = PPosition;
-        XSetWMNormalHints(display, xwindow, hints);
-        XFree(hints);
-
-        XMoveWindow(display, xwindow, newX, newY);
-    }
+    XReconfigureWMWindow(display, xwindow, 0, windowChangesMask, windowChanges);
 
 
-    if (windowChangesMask & (CWWidth | CWHeight)) {
-        int newWidth, newHeight;
-        newWidth = xattr.width;
-        newHeight = xattr.height;
+//
+//    XWindowAttributes xattr;
+//    if (!XGetWindowAttributes(display, xwindow, &xattr)) {
+//        g_print("XGetWindowAttributes FAIL!\n");
+//        return;
+//    }
+//
+//    if (windowChangesMask & (CWX | CWY)) {
+//        int newX, newY;
+//        newX = xattr.x;
+//        newY = xattr.y;
+//
+//        if (windowChangesMask & CWX) {
+//            newX = windowChanges->x;
+//        }
+//        if (windowChangesMask & CWY) {
+//            newY = windowChanges->y;
+//        }
+//
+//        g_print("newX %d, newY %d\n", newX, newY);
+//
+////        XSizeHints* hints = XAllocSizeHints();
+////        hints->x = newX;
+////        hints->y = newY;
+////        hints->flags = PPosition;
+////        XSetWMNormalHints(display, xwindow, hints);
+////        XFree(hints);
+////
+////        XMoveWindow(display, xwindow, newX, newY);
+//    }
+//
+//
+//    if (windowChangesMask & (CWWidth | CWHeight)) {
+//        int newWidth, newHeight;
+//        newWidth = xattr.width;
+//        newHeight = xattr.height;
+//
+//        if (windowChangesMask & CWWidth) {
+//            newWidth = windowChanges->width;
+//        }
+//        if (windowChangesMask & CWHeight) {
+//            newHeight = windowChanges->height;
+//        }
+//
+//        if (!resizable.value) {
+//        //TODO:
+////            GdkGeometry geom;
+////            GdkWindowHints hints = (GdkWindowHints)(GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE);
+////            geom.min_width = geom.max_width = newWidth;
+////            geom.min_height = geom.max_height = newHeight;
+////            gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom, hints);
+//        }
+//
+//        g_print("newWidth %d, newHeight %d\n", newWidth, newHeight);
+//
+//        XResizeWindow(display, xwindow, newWidth, newHeight);
+//    }
 
-        if (windowChangesMask & CWWidth) {
-            newWidth = windowChanges->width;
-        }
-        if (windowChangesMask & CWHeight) {
-            newHeight = windowChanges->height;
-        }
-
-        if (!resizable.value) {
-        //TODO:
-//            GdkGeometry geom;
-//            GdkWindowHints hints = (GdkWindowHints)(GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE);
-//            geom.min_width = geom.max_width = newWidth;
-//            geom.min_height = geom.max_height = newHeight;
-//            gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom, hints);
-        }
-
-        g_print("newWidth %d, newHeight %d\n", newWidth, newHeight);
-
-        XResizeWindow(display, xwindow, newWidth, newHeight);
-    }
-
-    XSync(display, FALSE);
-
-//    g_print("XConfigureWindow\n");
-
-//    XConfigureWindow(display, xwindow, windowChangesMask, windowChanges);
 }
 
 void WindowContextTop::applyShapeMask(void* data, uint width, uint height)
