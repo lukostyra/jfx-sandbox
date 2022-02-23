@@ -553,7 +553,7 @@ void WindowContextBase::process_key(GdkEventKey* event) {
 }
 
 void WindowContextBase::paint(void* data, jint width, jint height) {
-    g_print("Paint\n");
+    g_print("xxxxxxxxxxx Paint xxxxxxxxxx\n");
     XImage* image = XCreateImage(display, visual, depth, ZPixmap, 0, (char*) data, width, height, 32, 0);
     XPutImage(display, xwindow, DefaultGC(display, 0), image, 0, 0, 0, 0, width, height);
 
@@ -790,7 +790,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
             visual = vinfo[0].visual;
             depth = vinfo[0].depth;
         }
-        XFree(vinfo);
+//        XFree(vinfo);
     }
 
     XSetWindowAttributes attr;
@@ -1221,7 +1221,7 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
 }
 
 void WindowContextTop::update_window_constraints() {
-    g_print("update_window_constraints\n");
+//    g_print("update_window_constraints\n");
     if (resizable.value) {
         XSizeHints* hints = XAllocSizeHints();
 
@@ -1237,11 +1237,9 @@ void WindowContextTop::update_window_constraints() {
         hints->max_height = (resizable.maxh == -1) ? 100000
                            : resizable.maxh - geometry.extents.top - geometry.extents.bottom;
 
-//        hints->win_gravity = NorthWestGravity;
+        hints->flags = (PMinSize | PMaxSize);
 
-        hints->flags = (PMinSize | PMaxSize); // | PWinGravity);
-
-        g_print("XSetWMNormalHints: constraints\n");
+//        g_print("XSetWMNormalHints: constraints\n");
         XSetWMNormalHints(display, xwindow, hints);
 
         XFree(hints);
@@ -1249,7 +1247,7 @@ void WindowContextTop::update_window_constraints() {
 }
 
 void WindowContextTop::set_window_resizable(bool res) {
-    g_print("set_window_resizable\n");
+//    g_print("set_window_resizable\n");
     if(!res) {
         int w = geometry_get_content_width(&geometry);
         int h = geometry_get_content_height(&geometry);
@@ -1303,11 +1301,11 @@ void WindowContextTop::set_visible(bool visible)
     }
     WindowContextBase::set_visible(visible);
     //JDK-8220272 - fire event first because GDK_FOCUS_CHANGE is not always in order
-    if (visible && jwindow && isEnabled()) {
-        g_print("jWindowNotifyFocus -> com_sun_glass_events_WindowEvent_FOCUS_GAINED\n");
-        mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus, com_sun_glass_events_WindowEvent_FOCUS_GAINED);
-        CHECK_JNI_EXCEPTION(mainEnv);
-    }
+//    if (visible && jwindow && isEnabled()) {
+//        g_print("jWindowNotifyFocus -> com_sun_glass_events_WindowEvent_FOCUS_GAINED\n");
+//        mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus, com_sun_glass_events_WindowEvent_FOCUS_GAINED);
+//        CHECK_JNI_EXCEPTION(mainEnv);
+//    }
 }
 
 void WindowContextTop::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h, int cw, int ch) {
@@ -1387,10 +1385,33 @@ void WindowContextTop::process_map() {
 }
 
 void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned int windowChangesMask) {
-    g_print("window_configure: %d\n", windowChangesMask);
+//    g_print("window_configure: %d\n", windowChangesMask);
 
     if (windowChangesMask == 0) {
         return;
+    }
+
+    if (windowChangesMask & (CWX | CWY)) {
+        if (windowChangesMask & CWX) {
+            g_print("===>X %d\n", windowChanges->x);
+        }
+        if (windowChangesMask & CWY) {
+            g_print("===>Y %d\n", windowChanges->y);
+        }
+
+        //FIXME: for some reason this is not consisten
+        if (!map_received) {
+            g_print("size hints\n");
+            XSizeHints* hints = XAllocSizeHints();
+            hints->x = windowChanges->x;
+            hints->y = windowChanges->y;
+            hints->flags = PPosition;
+            XSetWMNormalHints(display, xwindow, hints);
+            XFree(hints);
+
+            //windowChangesMask &= ~(CWX | CWY);
+        }
+
     }
 
     XReconfigureWMWindow(display, xwindow, 0, windowChangesMask, windowChanges);
@@ -1584,13 +1605,7 @@ void WindowContextTop::restack(bool restack) {
 }
 
 void WindowContextTop::set_modal(bool modal, WindowContext* parent) {
-    if (modal) {
-        //gtk_window_set_type_hint(GTK_WINDOW(gtk_widget), GDK_WINDOW_TYPE_HINT_DIALOG);
-        if (parent) {
-            gtk_window_set_transient_for(GTK_WINDOW(gtk_widget), parent->get_gtk_window());
-        }
-    }
-    gtk_window_set_modal(GTK_WINDOW(gtk_widget), modal ? TRUE : FALSE);
+    //Currently not used
 }
 
 GtkWindow *WindowContextTop::get_gtk_window() {
