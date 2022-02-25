@@ -288,7 +288,7 @@ static inline jint gtk_button_number_to_mouse_button(guint button) {
         case MOUSE_FORWARD_BTN:
             return com_sun_glass_events_MouseEvent_BUTTON_FORWARD;
         default:
-            // Other buttons are not supported by quantum and are not reported by other platforms
+            // Other buttons are not sufported by quantum and are not reported by other platforms
             return com_sun_glass_events_MouseEvent_BUTTON_NONE;
     }
 }
@@ -557,11 +557,11 @@ void WindowContextBase::process_key(GdkEventKey* event) {
 }
 
 void WindowContextBase::paint(void* data, jint width, jint height) {
-    g_print("xxxxxxxxxxx Paint xxxxxxxxxx\n");
     XImage* image = XCreateImage(display, visual, depth, ZPixmap, 0, (char*) data, width, height, 32, 0);
     XPutImage(display, xwindow, DefaultGC(display, 0), image, 0, 0, 0, 0, width, height);
 
-    XDestroyImage(image);
+    //XPutImage probaly frees it, since this issues a double-free
+    //XDestroyImage(image);
 }
 
 void WindowContextBase::add_child(WindowContextTop* child) {
@@ -771,7 +771,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | ButtonMotionMask
 //               | KeymapStateMask
                | ExposureMask
-//               | VisibilityChangeMask
+               | VisibilityChangeMask
                | StructureNotifyMask
 //               | ResizeRedirectMask
                | SubstructureNotifyMask
