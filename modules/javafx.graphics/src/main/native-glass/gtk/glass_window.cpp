@@ -594,12 +594,11 @@ void WindowContextBase::reparent_children(WindowContext* parent) {
 
 void WindowContextBase::set_visible(bool visible) {
     if (visible) {
+        XFlush(display);
         g_print("XMapWindow\n");
         XMapWindow(display, xwindow);
-//        gtk_widget_show_all(gtk_widget);
     } else {
         XUnmapWindow(display, xwindow);
-//        gtk_widget_hide(gtk_widget);
         if (jview && is_mouse_entered) {
             is_mouse_entered = false;
             mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
@@ -620,7 +619,7 @@ bool WindowContextBase::is_visible() {
 //    if (XGetWindowAttributes(display, xwindow, &xattr)) {
 //        return !(xattr.map_state == IsUnmapped);
 //    }
-//    return gtk_widget_get_visible(gtk_widget);
+
 //    if (!map_received) {
 //        return false;
 //    }
@@ -753,8 +752,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
             location_assigned(false),
             size_assigned(false),
             on_top(false),
-            requested_bounds()
-{
+            requested_bounds() {
     jwindow = mainEnv->NewGlobalRef(_jwindow);
 
     int mask = KeyPressMask
@@ -882,6 +880,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     gdk_window = gtk_widget_get_window(gtk_widget);
 
     g_object_set_data_full(G_OBJECT(gdk_window), GDK_WINDOW_DATA_CONTEXT, this, NULL);
+    XFlush(display);
 
 //    gdk_window_register_dnd(gdk_window);
 
@@ -1150,10 +1149,10 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
             updateWindowConstraints = true;
             if (!frame_extents_initialized && !is_null_extents()) {
                 frame_extents_initialized = true;
-//                set_bounds(0, 0, false, false,
-//                    requested_bounds.width, requested_bounds.height,
-//                    requested_bounds.client_width, requested_bounds.client_height
-//                );
+                set_bounds(0, 0, false, false,
+                    requested_bounds.width, requested_bounds.height,
+                    requested_bounds.client_width, requested_bounds.client_height
+                );
             }
         }
     } else {
@@ -1402,14 +1401,14 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
     }
 
     if (windowChangesMask & (CWX | CWY)) {
-        if (windowChangesMask & CWX) {
-            g_print("===>X %d\n", windowChanges->x);
-        }
-        if (windowChangesMask & CWY) {
-            g_print("===>Y %d\n", windowChanges->y);
-        }
+//        if (windowChangesMask & CWX) {
+//            g_print("===>X %d\n", windowChanges->x);
+//        }
+//        if (windowChangesMask & CWY) {
+//            g_print("===>Y %d\n", windowChanges->y);
+//        }
 
-        //FIXME: for some reason this is not consisten
+        //FIXME: for some reason this is not consistent
         if (!map_received) {
             g_print("size hints\n");
             XSizeHints* hints = XAllocSizeHints();
@@ -1418,14 +1417,11 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
             hints->flags = PPosition;
             XSetWMNormalHints(display, xwindow, hints);
             XFree(hints);
-
-            //windowChangesMask &= ~(CWX | CWY);
         }
-
     }
 
     XReconfigureWMWindow(display, xwindow, 0, windowChangesMask, windowChanges);
-
+    XFlush(display);
 
 //
 //    XWindowAttributes xattr;
