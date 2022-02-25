@@ -153,6 +153,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
 //                    g_print("============> X11 Configure Request\n");
 //                    break;
                 case VisibilityNotify:
+                    g_print("X11 Visibility\n");
                     ctx->process_visibility(&xevent.xvisibility);
                     break;
                 case ConfigureNotify:
@@ -188,7 +189,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                     g_print("X11 Button\n");
                     break;
                 case MotionNotify:
-                    g_print("X11 Motion\n");
+                    //g_print("X11 Motion\n");
                     ctx->process_mouse_motion(&xevent.xmotion);
                     break;
                 case EnterNotify:
@@ -202,10 +203,6 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             }
         } catch (jni_exception&) {
         }
-
-        //TODO: Remove
-//        GdkEvent* event = gdk_event_source_translate_event(source, &xevent);
-//        process_events(event, NULL);
     }
 
     return TRUE;

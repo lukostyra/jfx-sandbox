@@ -142,6 +142,7 @@ void WindowContextBase::process_state(GdkEventWindowState* event) {
 
 void WindowContextBase::process_visibility(XVisibilityEvent* event) {
     visibility_state = event->state;
+    g_print("Visibility %d\n", visibility_state);
 }
 
 void WindowContextBase::process_focus(GdkEventFocus* event) {
@@ -624,7 +625,9 @@ bool WindowContextBase::is_visible() {
 //        return false;
 //    }
 
-    return (visibility_state != VisibilityFullyObscured);
+    //VisibilityUnobscured, VisibilityPartiallyObscured, VisibilityFullyObscured
+    return (visibility_state == VisibilityUnobscured
+                || visibility_state == VisibilityPartiallyObscured);
 }
 
 bool WindowContextBase::set_view(jobject view) {
