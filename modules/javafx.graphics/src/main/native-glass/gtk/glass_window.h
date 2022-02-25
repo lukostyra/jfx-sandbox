@@ -180,6 +180,7 @@ public:
     virtual void process_mouse_cross(XCrossingEvent*) = 0;
     virtual void process_key(GdkEventKey*) = 0;
     virtual void process_state(GdkEventWindowState*) = 0;
+    virtual void process_visibility(XVisibilityEvent*) = 0;
 
     virtual void notify_state(jint) = 0;
     virtual void notify_on_top(bool) {}
@@ -225,6 +226,7 @@ protected:
 
     GdkWMFunction gdk_windowManagerFunctions;
 
+    int visibility_state;
     bool is_iconified;
     bool is_maximized;
     bool is_mouse_entered;
@@ -290,7 +292,7 @@ public:
     void process_mouse_cross(XCrossingEvent*);
     void process_key(GdkEventKey*);
     void process_state(GdkEventWindowState*);
-
+    void process_visibility(XVisibilityEvent*);
     void notify_state(jint);
 
     void increment_events_counter();

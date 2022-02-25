@@ -152,6 +152,9 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
 //                case ConfigureRequest:
 //                    g_print("============> X11 Configure Request\n");
 //                    break;
+                case VisibilityNotify:
+                    ctx->process_visibility(&xevent.xvisibility);
+                    break;
                 case ConfigureNotify:
                     g_print("X11 Configure\n");
                     ctx->process_configure(&xevent.xconfigure);

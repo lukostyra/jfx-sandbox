@@ -140,6 +140,10 @@ void WindowContextBase::process_state(GdkEventWindowState* event) {
     }
 }
 
+void WindowContextBase::process_visibility(XVisibilityEvent* event) {
+    visibility_state = event->state;
+}
+
 void WindowContextBase::process_focus(GdkEventFocus* event) {
 }
 
@@ -611,13 +615,16 @@ void WindowContextBase::set_visible(bool visible) {
 }
 
 bool WindowContextBase::is_visible() {
-    XWindowAttributes xattr;
-    if (XGetWindowAttributes(display, xwindow, &xattr)) {
-        return !(xattr.map_state == IsUnmapped);
-    }
+//    XWindowAttributes xattr;
+//    if (XGetWindowAttributes(display, xwindow, &xattr)) {
+//        return !(xattr.map_state == IsUnmapped);
+//    }
 //    return gtk_widget_get_visible(gtk_widget);
+//    if (!map_received) {
+//        return false;
+//    }
 
-    return false;
+    return (visibility_state != VisibilityFullyObscured);
 }
 
 bool WindowContextBase::set_view(jobject view) {
@@ -1140,10 +1147,10 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
             updateWindowConstraints = true;
             if (!frame_extents_initialized && !is_null_extents()) {
                 frame_extents_initialized = true;
-                set_bounds(0, 0, false, false,
-                    requested_bounds.width, requested_bounds.height,
-                    requested_bounds.client_width, requested_bounds.client_height
-                );
+//                set_bounds(0, 0, false, false,
+//                    requested_bounds.width, requested_bounds.height,
+//                    requested_bounds.client_width, requested_bounds.client_height
+//                );
             }
         }
     } else {
