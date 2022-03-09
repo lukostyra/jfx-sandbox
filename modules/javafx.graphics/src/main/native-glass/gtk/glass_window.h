@@ -348,6 +348,7 @@ public:
     void process_configure(GdkEventConfigure*);
     void process_configure(XConfigureEvent*);
     void process_destroy();
+    void change_wm_state(bool add, Atom state1, Atom state2);
 
     WindowFrameExtents get_frame_extents();
 

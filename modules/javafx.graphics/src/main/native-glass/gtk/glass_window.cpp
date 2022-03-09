@@ -926,7 +926,7 @@ void WindowContextTop::activate_window() {
         clientMessage.data.l[1] = gdk_x11_get_server_time(gdk_window);
         clientMessage.data.l[2] = 0;
 
-        XSendEvent(display, XDefaultRootWindow(display), False,
+        XSendEvent(display, DefaultRootWindow(display), False,
                    SubstructureRedirectMask | SubstructureNotifyMask,
                    (XEvent *) &clientMessage);
         XFlush(display);
@@ -1068,7 +1068,7 @@ void WindowContextTop::process_property(XPropertyEvent* event) {
 void WindowContextTop::process_property_notify(GdkEventProperty* event) {
 //    static GdkAtom atom_net_wm_state = gdk_atom_intern_static_string("_NET_WM_STATE");
 //
-//    if (event->atom == atom_net_wm_state && event->window == gdk_window) {
+    //    if (event->atom == atom_net_wm_state && event->window == gdk_window) {
 //        process_net_wm_property();
 //    }
 }
@@ -1385,14 +1385,37 @@ void WindowContextTop::set_maximized(bool maximize) {
     }
 }
 
+void WindowContextTop::change_wm_state(bool add, Atom state1, Atom state2) {
+    XClientMessageEvent xclient;
+
+    memset(&xclient, 0, sizeof (xclient));
+    xclient.type = ClientMessage;
+    xclient.window = xwindow;
+    xclient.message_type = XInternAtom(display, "_NET_WM_STATE", true);
+    xclient.format = 32;
+    xclient.data.l[0] = add ? 1 : 0;
+    xclient.data.l[1] = state1;
+    xclient.data.l[2] = state2;
+    xclient.data.l[3] = 1; /* source indication */
+    xclient.data.l[4] = 0;
+
+    XSendEvent(display, DefaultRootWindow(display), False,
+                SubstructureRedirectMask | SubstructureNotifyMask, (XEvent *)&xclient);
+}
+
 void WindowContextTop::enter_fullscreen() {
-    //FIXME: may have multiple state properties
-    XChangeProperty(display, xwindow, XInternAtom(display, "_NET_WM_STATE", true),
-                    XA_WINDOW, 32, PropModeReplace, (unsigned char *) XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", true), 1);
+    //FIXME: may have to set this if unmapped
+//    Atom atoms[1];
+//    atoms[0] = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", true);
+//
+//    XChangeProperty(display, xwindow, XInternAtom(display, "_NET_WM_STATE", true),
+//                    XA_WINDOW, 32, PropModeReplace, (unsigned char *) atoms, 1);
+    change_wm_state(true, XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", true), None);
 }
 
 void WindowContextTop::exit_fullscreen() {
-    XDeleteProperty(display, xwindow, XInternAtom(display, "_NET_WM_STATE", true));
+    change_wm_state(false, XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", true), None);
+//    XDeleteProperty(display, xwindow, XInternAtom(display, "_NET_WM_STATE", true));
 }
 
 void WindowContextTop::request_focus() {
@@ -1407,9 +1430,12 @@ void WindowContextTop::set_focusable(bool focusable) {
 
 void WindowContextTop::set_title(const char* title) {
     //FIXME
-//    XSetWMName(display, xwindow, (XTextProperty *) title);
-    XStoreName(display, xwindow, title);
-//    gtk_window_set_title(GTK_WINDOW(gtk_widget),title);
+    XSetWMName(display, xwindow, (XTextProperty *) title);
+
+    XChangeProperty(display, xwindow,
+                   XInternAtom(display, "_NET_WM_NAME", true),
+                   XInternAtom(display, "UTF8_STRING", true), 8,
+                   PropModeReplace, (unsigned char*) title, strlen (title));
 }
 
 void WindowContextTop::set_alpha(double alpha) {
