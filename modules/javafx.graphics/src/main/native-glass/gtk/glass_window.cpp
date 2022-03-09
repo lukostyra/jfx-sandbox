@@ -1352,37 +1352,17 @@ void WindowContextTop::applyShapeMask(void* data, uint width, uint height)
 
 void WindowContextTop::set_minimized(bool minimize) {
     is_iconified = minimize;
-    if (minimize) {
-        if (frame_type == TRANSPARENT) {
-            // https://bugs.launchpad.net/ubuntu/+source/unity/+bug/1245571
-            glass_window_reset_input_shape_mask(gtk_widget_get_window(gtk_widget));
-        }
 
-        if ((gdk_windowManagerFunctions & GDK_FUNC_MINIMIZE) == 0) {
-            // in this case - the window manager will not support the programatic
-            // request to iconify - so we need to disable this until we are restored.
-            GdkWMFunction wmf = (GdkWMFunction)(gdk_windowManagerFunctions | GDK_FUNC_MINIMIZE);
-            gdk_window_set_functions(gdk_window, wmf);
-        }
-        gtk_window_iconify(GTK_WINDOW(gtk_widget));
-    } else {
-        gtk_window_deiconify(GTK_WINDOW(gtk_widget));
-        activate_window();
-    }
+    change_wm_state(minimize,
+                    XInternAtom(display, "_NET_WM_STATE_HIDDEN", true), None);
 }
+
 void WindowContextTop::set_maximized(bool maximize) {
     is_maximized = maximize;
-    if (maximize) {
-        // enable the functionality on the window manager as it might ignore the maximize command,
-        // for example when the window is undecorated.
-        GdkWMFunction wmf = (GdkWMFunction)(gdk_windowManagerFunctions | GDK_FUNC_MAXIMIZE);
-        gdk_window_set_functions(gdk_window, wmf);
 
-//        ensure_window_size();
-        gtk_window_maximize(GTK_WINDOW(gtk_widget));
-    } else {
-        gtk_window_unmaximize(GTK_WINDOW(gtk_widget));
-    }
+    change_wm_state(maximize,
+                    XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", true),
+                    XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", true));
 }
 
 void WindowContextTop::change_wm_state(bool add, Atom state1, Atom state2) {
@@ -1425,7 +1405,13 @@ void WindowContextTop::request_focus() {
 }
 
 void WindowContextTop::set_focusable(bool focusable) {
-    gtk_window_set_accept_focus(GTK_WINDOW(gtk_widget), focusable ? TRUE : FALSE);
+    XWMHints *hints = XAllocWMHints();
+    hints->input = focusable;
+    hints->flags = InputHint;
+    XSetWMHints(display, xwindow, hints);
+
+//    gtk_window_set_accept_focus(GTK_WINDOW(gtk_widget), focusable ? TRUE : FALSE);
+    XFree(hints);
 }
 
 void WindowContextTop::set_title(const char* title) {
