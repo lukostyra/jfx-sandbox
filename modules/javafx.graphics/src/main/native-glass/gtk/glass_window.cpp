@@ -289,7 +289,7 @@ static inline jint gtk_button_number_to_mouse_button(guint button) {
         case MOUSE_FORWARD_BTN:
             return com_sun_glass_events_MouseEvent_BUTTON_FORWARD;
         default:
-            // Other buttons are not sufported by quantum and are not reported by other platforms
+            // Other buttons are not supported by quantum and are not reported by other platforms
             return com_sun_glass_events_MouseEvent_BUTTON_NONE;
     }
 }
@@ -762,7 +762,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | EnterWindowMask
                | LeaveWindowMask
                | PointerMotionMask
-//               | PointerMotionHintMask
                | Button1MotionMask
                | Button2MotionMask
                | Button3MotionMask
@@ -770,17 +769,12 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | Button4MotionMask
                | Button5MotionMask
                | ButtonMotionMask
-//               | KeymapStateMask
                | ExposureMask
                | VisibilityChangeMask
                | StructureNotifyMask
-//               | ResizeRedirectMask
                | SubstructureNotifyMask
-//               | SubstructureRedirectMask
                | FocusChangeMask
                | PropertyChangeMask;
-//               | ColormapChangeMask
-//               | OwnerGrabButtonMask;
 
     display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
     visual = DefaultVisual(display, DefaultScreen(display));
@@ -815,10 +809,9 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     xparent = DefaultRootWindow(display);
     xwindow = XCreateWindow(display, xparent, 0, 0,
                             1, 1, 0, depth, InputOutput, visual,
-                            CWEventMask | CWOverrideRedirect | CWWinGravity |
-                            CWColormap | /*CWBorderPixel |*/ CWBackPixel, &attr);
+                            CWEventMask  | CWOverrideRedirect | CWBitGravity |
+                            CWColormap | CWBackPixel, &attr);
 
-//    g_print("Save Context ctX: %d, win: %ld\n", X_CONTEXT, xwindow);
     if (XSaveContext(display, xwindow, X_CONTEXT, XPointer(this)) != 0) {
         g_print("Fail to save context\n");
     }
@@ -881,7 +874,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
     g_object_set_data_full(G_OBJECT(gdk_window), GDK_WINDOW_DATA_CONTEXT, this, NULL);
     XFlush(display);
-
 //    gdk_window_register_dnd(gdk_window);
 
     if (frame_type == TITLED) {
@@ -1063,45 +1055,6 @@ static void geometry_set_window_y(WindowGeometry *windowGeometry, int value) {
     windowGeometry->refy = newValue;
 }
 
-void WindowContextTop::process_net_wm_property() {
-    // Workaround for https://bugs.launchpad.net/unity/+bug/998073
-
-    static GdkAtom atom_atom = gdk_atom_intern_static_string("ATOM");
-    static GdkAtom atom_net_wm_state = gdk_atom_intern_static_string("_NET_WM_STATE");
-    static GdkAtom atom_net_wm_state_hidden = gdk_atom_intern_static_string("_NET_WM_STATE_HIDDEN");
-    static GdkAtom atom_net_wm_state_above = gdk_atom_intern_static_string("_NET_WM_STATE_ABOVE");
-
-    gint length;
-
-    glong* atoms = NULL;
-
-    if (gdk_property_get(gdk_window, atom_net_wm_state, atom_atom,
-            0, G_MAXLONG, FALSE, NULL, NULL, &length, (guchar**) &atoms)) {
-
-        bool is_hidden = false;
-        bool is_above = false;
-        for (gint i = 0; i < (gint)(length / sizeof(glong)); i++) {
-            if (atom_net_wm_state_hidden == (GdkAtom)atoms[i]) {
-                is_hidden = true;
-            } else if (atom_net_wm_state_above == (GdkAtom)atoms[i]) {
-                is_above = true;
-            }
-        }
-
-        g_free(atoms);
-
-        if (is_iconified != is_hidden) {
-            is_iconified = is_hidden;
-
-            notify_state((is_hidden)
-                    ? com_sun_glass_events_WindowEvent_MINIMIZE
-                    : com_sun_glass_events_WindowEvent_RESTORE);
-        }
-
-        notify_on_top(is_above);
-    }
-}
-
 void WindowContextTop::process_property(XPropertyEvent* event) {
     Atom frame_extents_atom = XInternAtom(display, "_NET_FRAME_EXTENTS", True);
     if (event->state == PropertyNewValue && event->window == xwindow) {
@@ -1113,11 +1066,11 @@ void WindowContextTop::process_property(XPropertyEvent* event) {
 }
 
 void WindowContextTop::process_property_notify(GdkEventProperty* event) {
-    static GdkAtom atom_net_wm_state = gdk_atom_intern_static_string("_NET_WM_STATE");
-
-    if (event->atom == atom_net_wm_state && event->window == gdk_window) {
-        process_net_wm_property();
-    }
+//    static GdkAtom atom_net_wm_state = gdk_atom_intern_static_string("_NET_WM_STATE");
+//
+//    if (event->atom == atom_net_wm_state && event->window == gdk_window) {
+//        process_net_wm_property();
+//    }
 }
 
 void WindowContextTop::process_configure(GdkEventConfigure* event) {
@@ -1125,7 +1078,6 @@ void WindowContextTop::process_configure(GdkEventConfigure* event) {
 
 void WindowContextTop::process_configure(XConfigureEvent* event) {
     int x, y, w, h;
-    bool updateWindowConstraints = false;
 
 
     if (frame_type == TITLED) {
@@ -1146,7 +1098,7 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
         geometry.current_height = wh;
 
         if (update_frame_extents()) {
-            updateWindowConstraints = true;
+//            updateWindowConstraints = true;
             if (!frame_extents_initialized && !is_null_extents()) {
                 frame_extents_initialized = true;
                 set_bounds(0, 0, false, false,
@@ -1218,22 +1170,13 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
             screen = to_screen;
         }
     }
-
-    if (resizable.request != REQUEST_NONE) {
-        set_window_resizable(resizable.request == REQUEST_RESIZABLE);
-        resizable.request = REQUEST_NONE;
-    } else if (!resizable.value) {
-        set_window_resizable(false);
-    } else if (updateWindowConstraints) {
-        update_window_constraints();
-    }
 }
 
 void WindowContextTop::update_window_constraints() {
-//    g_print("update_window_constraints\n");
-    if (resizable.value) {
-        XSizeHints* hints = XAllocSizeHints();
+    g_print("update_window_constraints\n");
+    XSizeHints* hints = XAllocSizeHints();
 
+    if (resizable.value) {
         hints->min_width = (resizable.minw == -1) ? 1
                            : resizable.minw - geometry.extents.left - geometry.extents.right;
 
@@ -1246,20 +1189,11 @@ void WindowContextTop::update_window_constraints() {
         hints->max_height = (resizable.maxh == -1) ? 100000
                            : resizable.maxh - geometry.extents.top - geometry.extents.bottom;
 
-        hints->flags = (PMinSize | PMaxSize);
-
-//        g_print("XSetWMNormalHints: constraints\n");
-        XSetWMNormalHints(display, xwindow, hints);
-
-        XFree(hints);
-    }
-}
-
-void WindowContextTop::set_window_resizable(bool res) {
-//    g_print("set_window_resizable\n");
-    if(!res) {
+    } else {
         int w = geometry_get_content_width(&geometry);
         int h = geometry_get_content_height(&geometry);
+
+        //FIXME: when it's -1 ?
         if (w == -1 && h == -1) {
             XWindowAttributes xattr;
             if (XGetWindowAttributes(display, xwindow, &xattr)) {
@@ -1274,41 +1208,33 @@ void WindowContextTop::set_window_resizable(bool res) {
         hints->min_height = h;
         hints->max_width = w;
         hints->max_height = h;
-        hints->flags = (PMinSize | PMaxSize);
-
-        XSetWMNormalHints(display, xwindow, hints);
-        XFree(hints);
-        resizable.value = false;
-    } else {
-        resizable.value = true;
-        update_window_constraints();
     }
+
+    hints->flags = (PMinSize | PMaxSize);
+
+    g_print("XSetNormalHints: constraints\n");
+    XSetWMNormalHints(display, xwindow, hints);
+    XFree(hints);
+
 }
 
 void WindowContextTop::set_resizable(bool res) {
-    resizable.prev = false;
-//    gint w, h;
-//    gtk_window_get_size(GTK_WINDOW(gtk_widget), &w, &h);
-//    if (map_received || w > 1 || h > 1) {
-    if (map_received) {
-        set_window_resizable(res);
-    } else {
-        //Since window is not ready yet set only request for change of resizable.
-        resizable.request  = res ? REQUEST_RESIZABLE : REQUEST_NOT_RESIZABLE;
-    }
+    resizable.value = res;
+    update_window_constraints();
 }
 
-void WindowContextTop::set_visible(bool visible)
-{
-    if (visible) {
-        if (!size_assigned) {
-            set_bounds(0, 0, false, false, 320, 200, -1, -1);
-        }
-        if (!location_assigned) {
-            set_bounds(0, 0, true, true, -1, -1, -1, -1);
-        }
-    }
+void WindowContextTop::set_visible(bool visible) {
+//    if (visible) {
+//        if (!size_assigned) {
+//            set_bounds(0, 0, false, false, 320, 200, -1, -1);
+//        }
+//        if (!location_assigned) {
+//            set_bounds(0, 0, true, true, -1, -1, -1, -1);
+//        }
+//    }
+
     WindowContextBase::set_visible(visible);
+
     //JDK-8220272 - fire event first because GDK_FOCUS_CHANGE is not always in order
 //    if (visible && jwindow && isEnabled()) {
 //        g_print("jWindowNotifyFocus -> com_sun_glass_events_WindowEvent_FOCUS_GAINED\n");
@@ -1394,20 +1320,11 @@ void WindowContextTop::process_map() {
 }
 
 void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned int windowChangesMask) {
-//    g_print("window_configure: %d\n", windowChangesMask);
-
     if (windowChangesMask == 0) {
         return;
     }
 
     if (windowChangesMask & (CWX | CWY)) {
-//        if (windowChangesMask & CWX) {
-//            g_print("===>X %d\n", windowChanges->x);
-//        }
-//        if (windowChangesMask & CWY) {
-//            g_print("===>Y %d\n", windowChanges->y);
-//        }
-
         //FIXME: for some reason this is not consistent
         if (!map_received) {
             g_print("size hints\n");
@@ -1422,65 +1339,6 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
 
     XReconfigureWMWindow(display, xwindow, 0, windowChangesMask, windowChanges);
     XFlush(display);
-
-//
-//    XWindowAttributes xattr;
-//    if (!XGetWindowAttributes(display, xwindow, &xattr)) {
-//        g_print("XGetWindowAttributes FAIL!\n");
-//        return;
-//    }
-//
-//    if (windowChangesMask & (CWX | CWY)) {
-//        int newX, newY;
-//        newX = xattr.x;
-//        newY = xattr.y;
-//
-//        if (windowChangesMask & CWX) {
-//            newX = windowChanges->x;
-//        }
-//        if (windowChangesMask & CWY) {
-//            newY = windowChanges->y;
-//        }
-//
-//        g_print("newX %d, newY %d\n", newX, newY);
-//
-////        XSizeHints* hints = XAllocSizeHints();
-////        hints->x = newX;
-////        hints->y = newY;
-////        hints->flags = PPosition;
-////        XSetWMNormalHints(display, xwindow, hints);
-////        XFree(hints);
-////
-////        XMoveWindow(display, xwindow, newX, newY);
-//    }
-//
-//
-//    if (windowChangesMask & (CWWidth | CWHeight)) {
-//        int newWidth, newHeight;
-//        newWidth = xattr.width;
-//        newHeight = xattr.height;
-//
-//        if (windowChangesMask & CWWidth) {
-//            newWidth = windowChanges->width;
-//        }
-//        if (windowChangesMask & CWHeight) {
-//            newHeight = windowChanges->height;
-//        }
-//
-//        if (!resizable.value) {
-//        //TODO:
-////            GdkGeometry geom;
-////            GdkWindowHints hints = (GdkWindowHints)(GDK_HINT_MIN_SIZE | GDK_HINT_MAX_SIZE);
-////            geom.min_width = geom.max_width = newWidth;
-////            geom.min_height = geom.max_height = newHeight;
-////            gtk_window_set_geometry_hints(GTK_WINDOW(gtk_widget), NULL, &geom, hints);
-//        }
-//
-//        g_print("newWidth %d, newHeight %d\n", newWidth, newHeight);
-//
-//        XResizeWindow(display, xwindow, newWidth, newHeight);
-//    }
-
 }
 
 void WindowContextTop::applyShapeMask(void* data, uint width, uint height)
@@ -1490,21 +1348,6 @@ void WindowContextTop::applyShapeMask(void* data, uint width, uint height)
     }
 
     glass_window_apply_shape_mask(gtk_widget_get_window(gtk_widget), data, width, height);
-}
-
-void WindowContextTop::ensure_window_size() {
-    gint w, h;
-#ifdef GLASS_GTK3
-    gdk_window_get_geometry(gdk_window, NULL, NULL, &w, &h);
-#else
-    gdk_window_get_geometry(gdk_window, NULL, NULL, &w, &h, NULL);
-#endif
-    if (size_assigned && (geometry.final_width.value != w
-                       || geometry.final_height.value != h)) {
-
-        gdk_window_resize(gdk_window, geometry.final_width.value,
-                                      geometry.final_height.value);
-    }
 }
 
 void WindowContextTop::set_minimized(bool minimize) {
@@ -1535,7 +1378,7 @@ void WindowContextTop::set_maximized(bool maximize) {
         GdkWMFunction wmf = (GdkWMFunction)(gdk_windowManagerFunctions | GDK_FUNC_MAXIMIZE);
         gdk_window_set_functions(gdk_window, wmf);
 
-        ensure_window_size();
+//        ensure_window_size();
         gtk_window_maximize(GTK_WINDOW(gtk_widget));
     } else {
         gtk_window_unmaximize(GTK_WINDOW(gtk_widget));
@@ -1543,22 +1386,19 @@ void WindowContextTop::set_maximized(bool maximize) {
 }
 
 void WindowContextTop::enter_fullscreen() {
-    ensure_window_size();
-    gtk_window_fullscreen(GTK_WINDOW(gtk_widget));
+    //FIXME: may have multiple state properties
+    XChangeProperty(display, xwindow, XInternAtom(display, "_NET_WM_STATE", true),
+                    XA_WINDOW, 32, PropModeReplace, (unsigned char *) XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", true), 1);
 }
 
 void WindowContextTop::exit_fullscreen() {
-    gtk_window_unfullscreen(GTK_WINDOW(gtk_widget));
+    XDeleteProperty(display, xwindow, XInternAtom(display, "_NET_WM_STATE", true));
 }
 
 void WindowContextTop::request_focus() {
-    //JDK-8212060: Window show and then move glitch.
-    //The WindowContextBase::set_visible will take care of showing the window.
-    //The below code will only handle later request_focus.
-    if (is_visible()) {
-        XRaiseWindow(display, xwindow);
-//        gtk_window_present(GTK_WINDOW(gtk_widget));
-    }
+//    XRaiseWindow(display, xwindow);
+//RevertToParent, RevertToPointerRoot, or RevertToNone
+    XSetInputFocus(display, xwindow, RevertToParent, CurrentTime);
 }
 
 void WindowContextTop::set_focusable(bool focusable) {
@@ -1566,6 +1406,8 @@ void WindowContextTop::set_focusable(bool focusable) {
 }
 
 void WindowContextTop::set_title(const char* title) {
+    //FIXME
+//    XSetWMName(display, xwindow, (XTextProperty *) title);
     XStoreName(display, xwindow, title);
 //    gtk_window_set_title(GTK_WINDOW(gtk_widget),title);
 }
@@ -1575,19 +1417,7 @@ void WindowContextTop::set_alpha(double alpha) {
 }
 
 void WindowContextTop::set_enabled(bool enabled) {
-    if (enabled) {
-        if (resizable.prev) {
-            set_window_resizable(true);
-        }
-    } else {
-        if (resizable.value) {
-            set_window_resizable(false);
-            resizable.prev = true;
-        } else if (resizable.request == REQUEST_RESIZABLE) {
-            resizable.request = REQUEST_NOT_RESIZABLE;
-            resizable.prev = true;
-        }
-    }
+
 }
 
 void WindowContextTop::set_minimum_size(int w, int h) {

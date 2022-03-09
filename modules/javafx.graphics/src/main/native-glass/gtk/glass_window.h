@@ -60,11 +60,13 @@ enum WindowType {
     POPUP
 };
 
+/*
 enum request_type {
     REQUEST_NONE,
     REQUEST_RESIZABLE,
     REQUEST_NOT_RESIZABLE
 };
+*/
 
 typedef struct {
     unsigned long flags;
@@ -314,11 +316,8 @@ class WindowContextTop: public WindowContextBase {
     struct WindowContext *owner;
     WindowGeometry geometry;
     struct _Resizable{// we can't use set/get gtk_window_resizable function
-        _Resizable(): request(REQUEST_NONE), value(true), prev(false),
-                minw(-1), minh(-1), maxw(-1), maxh(-1){}
-        request_type request; //request for future setResizable
+        _Resizable(): value(true), minw(-1), minh(-1), maxw(-1), maxh(-1) {}
         bool value; //actual value of resizable for a window
-        bool prev; //former resizable value (used in setEnabled for parents of modal window)
         int minw, minh, maxw, maxh; //minimum and maximum window width/height;
     } resizable;
 
@@ -349,7 +348,6 @@ public:
     void process_configure(GdkEventConfigure*);
     void process_configure(XConfigureEvent*);
     void process_destroy();
-    void process_net_wm_property();
 
     WindowFrameExtents get_frame_extents();
 
@@ -390,11 +388,9 @@ private:
     WindowFrameExtents get_cached_extents();
     void window_configure(XWindowChanges *, unsigned int);
     void update_window_constraints();
-    void set_window_resizable(bool);
     void update_ontop_tree(bool);
     bool on_top_inherited();
     bool effective_on_top();
-    void ensure_window_size();
     WindowContextTop(WindowContextTop&);
     WindowContextTop& operator= (const WindowContextTop&);
 };
