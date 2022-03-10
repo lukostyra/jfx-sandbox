@@ -1406,16 +1406,14 @@ void WindowContextTop::request_focus() {
 
 void WindowContextTop::set_focusable(bool focusable) {
     XWMHints *hints = XAllocWMHints();
-    hints->input = focusable;
+    hints->input = (focusable) ? True : False;
     hints->flags = InputHint;
     XSetWMHints(display, xwindow, hints);
 
-//    gtk_window_set_accept_focus(GTK_WINDOW(gtk_widget), focusable ? TRUE : FALSE);
     XFree(hints);
 }
 
 void WindowContextTop::set_title(const char* title) {
-    //FIXME
     XSetWMName(display, xwindow, (XTextProperty *) title);
 
     XChangeProperty(display, xwindow,
