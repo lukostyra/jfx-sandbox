@@ -294,6 +294,35 @@ static inline jint gtk_button_number_to_mouse_button(guint button) {
     }
 }
 
+void WindowContextBase::process_mouse_button(XButtonEvent *event) {
+    bool press = event->type == ButtonPress;
+
+    jint button = gtk_button_number_to_mouse_button(event->button);
+
+    //TODO: modifier
+    int keymask = 0;
+
+    if (jview && button != com_sun_glass_events_MouseEvent_BUTTON_NONE) {
+        mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
+                press ? com_sun_glass_events_MouseEvent_DOWN : com_sun_glass_events_MouseEvent_UP,
+                button,
+                (jint) event->x, (jint) event->y,
+                (jint) event->x_root, (jint) event->y_root,
+                keymask,
+                (event->button == 3 && press) ? JNI_TRUE : JNI_FALSE,
+                JNI_FALSE);
+        CHECK_JNI_EXCEPTION(mainEnv)
+
+        if (jview && event->button == 3 && press) {
+            mainEnv->CallVoidMethod(jview, jViewNotifyMenu,
+                    (jint)event->x, (jint)event->y,
+                    (jint)event->x_root, (jint)event->y_root,
+                    JNI_FALSE);
+            CHECK_JNI_EXCEPTION(mainEnv)
+        }
+    }
+}
+
 void WindowContextBase::process_mouse_button(GdkEventButton* event) {
     bool press = event->type == GDK_BUTTON_PRESS;
     guint state = event->state;
@@ -692,15 +721,15 @@ void WindowContextBase::ungrab_focus() {
 }
 
 void WindowContextBase::set_cursor(GdkCursor* cursor) {
-    if (!is_in_drag()) {
-        if (WindowContextBase::sm_mouse_drag_window) {
-            glass_gdk_mouse_devices_grab_with_cursor(
-                    WindowContextBase::sm_mouse_drag_window->get_gdk_window(), cursor, FALSE);
-        } else if (WindowContextBase::sm_grab_window) {
-            glass_gdk_mouse_devices_grab_with_cursor(
-                    WindowContextBase::sm_grab_window->get_gdk_window(), cursor, TRUE);
-        }
-    }
+//    if (!is_in_drag()) {
+//        if (WindowContextBase::sm_mouse_drag_window) {
+//            glass_gdk_mouse_devices_grab_with_cursor(
+//                    WindowContextBase::sm_mouse_drag_window->get_gdk_window(), cursor, FALSE);
+//        } else if (WindowContextBase::sm_grab_window) {
+//            glass_gdk_mouse_devices_grab_with_cursor(
+//                    WindowContextBase::sm_grab_window->get_gdk_window(), cursor, TRUE);
+//        }
+//    }
     gdk_window_set_cursor(gdk_window, cursor);
 }
 
@@ -944,6 +973,7 @@ void WindowContextTop::update_frame_extents() {
                 geometry.extents.left = left;
                 geometry.extents.bottom = bottom;
                 geometry.extents.right = right;
+                update_window_constraints();
             }
         }
     }
@@ -1140,14 +1170,14 @@ void WindowContextTop::update_window_constraints() {
         int w = geometry_get_content_width(&geometry);
         int h = geometry_get_content_height(&geometry);
 
-        //FIXME: when it's -1 ?
-        if (w == -1 && h == -1) {
-            XWindowAttributes xattr;
-            if (XGetWindowAttributes(display, xwindow, &xattr)) {
-                w = xattr.width;
-                h = xattr.height;
-            }
-        }
+//        //FIXME: when it's -1 ?
+//        if (w == -1 && h == -1) {
+//            XWindowAttributes xattr;
+//            if (XGetWindowAttributes(display, xwindow, &xattr)) {
+//                w = xattr.width;
+//                h = xattr.height;
+//            }
+//        }
 
         hints->min_width = w;
         hints->min_height = h;
@@ -1185,17 +1215,6 @@ void WindowContextTop::set_bounds(int x, int y, bool xSet, bool ySet, int w, int
     requested_bounds.height = h;
     requested_bounds.client_width = cw;
     requested_bounds.client_height = ch;
-
-//    if (!frame_extents_initialized && frame_type == TITLED) {
-//        update_frame_extents();
-//        if (is_null_extents()) {
-//            if (!is_null_extents(get_cached_extents())) {
-//                geometry.extents = get_cached_extents();
-//            }
-//        } else {
-//            frame_extents_initialized = true;
-//        }
-//    }
 
     XWindowChanges windowChanges;
     unsigned int windowChangesMask = 0;
@@ -1273,7 +1292,7 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
     }
 
     XReconfigureWMWindow(display, xwindow, 0, windowChangesMask, windowChanges);
-    XFlush(display);
+//    XFlush(display);
 }
 
 void WindowContextTop::applyShapeMask(void* data, uint width, uint height)

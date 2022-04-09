@@ -175,6 +175,7 @@ public:
     virtual void process_expose(XExposeEvent *) = 0;
     virtual void process_damage(XDamageNotifyEvent *) = 0;
     virtual void process_mouse_button(GdkEventButton*) = 0;
+    virtual void process_mouse_button(XButtonEvent*) = 0;
     virtual void process_mouse_motion(GdkEventMotion*) = 0;
     virtual void process_mouse_motion(XMotionEvent *) = 0;
     virtual void process_mouse_scroll(GdkEventScroll*) = 0;
@@ -287,6 +288,7 @@ public:
     void process_expose(XExposeEvent *);
     void process_damage(XDamageNotifyEvent *);
     void process_mouse_button(GdkEventButton*);
+    void process_mouse_button(XButtonEvent*);
     void process_mouse_motion(GdkEventMotion*);
     void process_mouse_motion(XMotionEvent*);
     void process_mouse_scroll(GdkEventScroll*);
