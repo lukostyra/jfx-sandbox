@@ -153,11 +153,11 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
 //                    g_print("============> X11 Configure Request\n");
 //                    break;
                 case VisibilityNotify:
-                    g_print("X11 Visibility\n");
+//                    g_print("X11 Visibility\n");
                     ctx->process_visibility(&xevent.xvisibility);
                     break;
                 case ConfigureNotify:
-                    g_print("X11 Configure\n");
+//                    g_print("X11 Configure\n");
                     ctx->process_configure(&xevent.xconfigure);
                     break;
                 case PropertyNotify:
@@ -165,16 +165,16 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                     ctx->process_property(&xevent.xproperty);
                     break;
                 case MapNotify:
-                    g_print("X11 MAP\n");
+//                    g_print("X11 MAP\n");
                     ctx->process_map();
                     break;
                 case FocusIn:
                 case FocusOut:
-                    g_print("X11 Focus\n");
+//                    g_print("X11 Focus\n");
                     ctx->process_focus(&xevent.xfocus);
                     break;
                 case Expose:
-                    g_print("X11 Expose\n");
+//                    g_print("X11 Expose\n");
                     ctx->process_expose(&xevent.xexpose);
                     break;
                 case XDamageNotify:
@@ -182,11 +182,11 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                     break;
                 case KeyPress:
                 case KeyRelease:
-                    g_print("X11 Key\n");
+//                    g_print("X11 Key\n");
                     break;
                 case ButtonPress:
                 case ButtonRelease:
-                    g_print("X11 Button\n");
+//                    g_print("X11 Button\n");
                     break;
                 case MotionNotify:
                     //g_print("X11 Motion\n");

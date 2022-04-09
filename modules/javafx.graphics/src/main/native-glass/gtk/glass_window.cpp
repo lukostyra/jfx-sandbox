@@ -168,7 +168,7 @@ void WindowContextBase::process_focus(XFocusChangeEvent* event) {
 
     if (jwindow) {
         if (!in || isEnabled()) {
-            g_print("jWindowNotifyFocus\n");
+//            g_print("jWindowNotifyFocus\n");
             mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus,
                         in ? com_sun_glass_events_WindowEvent_FOCUS_GAINED : com_sun_glass_events_WindowEvent_FOCUS_LOST);
             CHECK_JNI_EXCEPTION(mainEnv)
@@ -734,10 +734,6 @@ WindowContextBase::~WindowContextBase() {
 }
 
 ////////////////////////////// WindowContextTop /////////////////////////////////
-WindowFrameExtents WindowContextTop::normal_extents = {28, 1, 1, 1};
-WindowFrameExtents WindowContextTop::utility_extents = {28, 1, 1, 1};
-
-
 WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long _screen,
         WindowFrameType _frame_type, WindowType type, int wmf) :
             WindowContextBase(),
@@ -875,10 +871,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     g_object_set_data_full(G_OBJECT(gdk_window), GDK_WINDOW_DATA_CONTEXT, this, NULL);
     XFlush(display);
 //    gdk_window_register_dnd(gdk_window);
-
-    if (frame_type == TITLED) {
-        request_frame_extents();
-    }
 }
 
 // Applied to a temporary full screen window to prevent sending events to Java
@@ -890,24 +882,6 @@ void WindowContextTop::detach_from_java() {
     if (jwindow) {
         mainEnv->DeleteGlobalRef(jwindow);
         jwindow = NULL;
-    }
-}
-
-void WindowContextTop::request_frame_extents() {
-    Atom rfeAtom = XInternAtom(display, "_NET_REQUEST_FRAME_EXTENTS", True);
-    if (rfeAtom != None) {
-        XClientMessageEvent clientMessage;
-        memset(&clientMessage, 0, sizeof(clientMessage));
-
-        clientMessage.type = ClientMessage;
-        clientMessage.window = xwindow;
-        clientMessage.message_type = rfeAtom;
-        clientMessage.format = 32;
-
-        XSendEvent(display, DefaultRootWindow(display), False,
-                   SubstructureRedirectMask | SubstructureNotifyMask,
-                   (XEvent *) &clientMessage);
-        XFlush(display);
     }
 }
 
@@ -933,26 +907,16 @@ void WindowContextTop::activate_window() {
     }
 }
 
-void WindowContextTop::set_cached_extents(WindowFrameExtents ex) {
-    if (window_type == NORMAL) {
-        normal_extents = ex;
-    } else {
-        utility_extents = ex;
-    }
-}
-
-WindowFrameExtents WindowContextTop::get_cached_extents() {
-    return window_type == NORMAL ? normal_extents : utility_extents;
-}
-
-
-bool WindowContextTop::update_frame_extents() {
+void WindowContextTop::update_frame_extents() {
     g_print("update_frame_extents\n");
+    if (frame_type != TITLED) {
+        return;
+    }
 
-    //TODO: cache
+    //TODO: check if WM Supports it
     Atom frame_extents_atom = XInternAtom(display, "_NET_FRAME_EXTENTS", True);
     bool changed = false;
-    int top, left, bottom, right;
+    long top, left, bottom, right;
 
     Atom type_return;
     unsigned long nitems_return;
@@ -962,13 +926,14 @@ bool WindowContextTop::update_frame_extents() {
 
     if (XGetWindowProperty(display, xwindow, frame_extents_atom, 0, G_MAXLONG, False, XA_CARDINAL, &type_return,
                             &format_return, &nitems_return, &bytes_after_return, &data) == Success) {
-        if ((type_return == XA_CARDINAL) && (format_return == 32) && (nitems_return == 4) && (data)) {
-            top = data[0];
-            left = data[1];
-            bottom = data[2];
-            right = data[3];
+        if (type_return == XA_CARDINAL && format_return == 32 && nitems_return == 4 && data) {
+            long* extents = (long *) data;
+            left = extents[0];
+            right = extents[1];
+            top = extents[2];
+            bottom = extents[3];
 
-            g_print("Frame extents: %d, %d, %d, %d\n", top, left, bottom, right);
+            g_print("Frame extents: %ld, %ld, %ld, %ld\n", top, left, bottom, right);
 
             changed = geometry.extents.top != top
                         || geometry.extents.left != left
@@ -979,13 +944,13 @@ bool WindowContextTop::update_frame_extents() {
                 geometry.extents.left = left;
                 geometry.extents.bottom = bottom;
                 geometry.extents.right = right;
-                if (!is_null_extents()) {
-                    set_cached_extents(geometry.extents);
-                }
             }
         }
     }
-    return changed;
+
+    if(data) {
+        XFree(data);
+    }
 }
 
 static int geometry_get_window_width(const WindowGeometry *windowGeometry) {
@@ -1059,7 +1024,7 @@ void WindowContextTop::process_property(XPropertyEvent* event) {
     Atom frame_extents_atom = XInternAtom(display, "_NET_FRAME_EXTENTS", True);
     if (event->state == PropertyNewValue && event->window == xwindow) {
         if (event->atom == frame_extents_atom) {
-            g_print("Got frame extents!!!!!!!!!\n");
+            g_print("Got frame extents\n");
             update_frame_extents();
         }
     }
@@ -1079,7 +1044,6 @@ void WindowContextTop::process_configure(GdkEventConfigure* event) {
 void WindowContextTop::process_configure(XConfigureEvent* event) {
     int x, y, w, h;
 
-
     if (frame_type == TITLED) {
         Window root;
         Window child;
@@ -1096,17 +1060,6 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
         h = wh;
         geometry.current_width = ww;
         geometry.current_height = wh;
-
-        if (update_frame_extents()) {
-//            updateWindowConstraints = true;
-            if (!frame_extents_initialized && !is_null_extents()) {
-                frame_extents_initialized = true;
-                set_bounds(0, 0, false, false,
-                    requested_bounds.width, requested_bounds.height,
-                    requested_bounds.client_width, requested_bounds.client_height
-                );
-            }
-        }
     } else {
         x = event->x;
         y = event->y;
@@ -1114,12 +1067,6 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
         h = event->height;
     }
     g_print("process_configure: %d, %d, %d, %d\n", x, y, w, h);
-
-    if (size_assigned && w <= 1 && h <= 1 && (geometry.final_width.value > 1 ||
-                                             geometry.final_height.value > 1)) {
-        // skip artifact
-        return;
-   }
 
     // JDK-8232811: to avoid conflicting events, update the geometry only after window pops.
     if (map_received) {
@@ -1133,7 +1080,7 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
     geometry_set_window_y(&geometry, y);
 
     if (jview) {
-        g_print("jViewNotifyResize\n");
+//        g_print("jViewNotifyResize\n");
         mainEnv->CallVoidMethod(jview, jViewNotifyResize,
                 event->width,
                 event->height);
@@ -1144,7 +1091,7 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
     }
 
     if (jwindow) {
-        g_print("jWindowNotifyResize -> %d,%d\n", geometry.current_width, geometry.current_height);
+//        g_print("jWindowNotifyResize -> %d,%d\n", geometry.current_width, geometry.current_height);
 
         mainEnv->CallVoidMethod(jwindow, jWindowNotifyResize,
                 (is_maximized)
@@ -1173,7 +1120,7 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
 }
 
 void WindowContextTop::update_window_constraints() {
-    g_print("update_window_constraints\n");
+//    g_print("update_window_constraints\n");
     XSizeHints* hints = XAllocSizeHints();
 
     if (resizable.value) {
@@ -1202,8 +1149,6 @@ void WindowContextTop::update_window_constraints() {
             }
         }
 
-        XSizeHints* hints = XAllocSizeHints();
-
         hints->min_width = w;
         hints->min_height = h;
         hints->max_width = w;
@@ -1212,10 +1157,9 @@ void WindowContextTop::update_window_constraints() {
 
     hints->flags = (PMinSize | PMaxSize);
 
-    g_print("XSetNormalHints: constraints\n");
+//    g_print("XSetNormalHints: constraints\n");
     XSetWMNormalHints(display, xwindow, hints);
     XFree(hints);
-
 }
 
 void WindowContextTop::set_resizable(bool res) {
@@ -1224,15 +1168,6 @@ void WindowContextTop::set_resizable(bool res) {
 }
 
 void WindowContextTop::set_visible(bool visible) {
-//    if (visible) {
-//        if (!size_assigned) {
-//            set_bounds(0, 0, false, false, 320, 200, -1, -1);
-//        }
-//        if (!location_assigned) {
-//            set_bounds(0, 0, true, true, -1, -1, -1, -1);
-//        }
-//    }
-
     WindowContextBase::set_visible(visible);
 
     //JDK-8220272 - fire event first because GDK_FOCUS_CHANGE is not always in order
@@ -1251,16 +1186,16 @@ void WindowContextTop::set_bounds(int x, int y, bool xSet, bool ySet, int w, int
     requested_bounds.client_width = cw;
     requested_bounds.client_height = ch;
 
-    if (!frame_extents_initialized && frame_type == TITLED) {
-        update_frame_extents();
-        if (is_null_extents()) {
-            if (!is_null_extents(get_cached_extents())) {
-                geometry.extents = get_cached_extents();
-            }
-        } else {
-            frame_extents_initialized = true;
-        }
-    }
+//    if (!frame_extents_initialized && frame_type == TITLED) {
+//        update_frame_extents();
+//        if (is_null_extents()) {
+//            if (!is_null_extents(get_cached_extents())) {
+//                geometry.extents = get_cached_extents();
+//            }
+//        } else {
+//            frame_extents_initialized = true;
+//        }
+//    }
 
     XWindowChanges windowChanges;
     unsigned int windowChangesMask = 0;
