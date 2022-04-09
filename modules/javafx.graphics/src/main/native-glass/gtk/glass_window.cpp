@@ -721,6 +721,7 @@ void WindowContextBase::ungrab_focus() {
 }
 
 void WindowContextBase::set_cursor(GdkCursor* cursor) {
+//TODO: XChangeActivePointerGrab.
 //    if (!is_in_drag()) {
 //        if (WindowContextBase::sm_mouse_drag_window) {
 //            glass_gdk_mouse_devices_grab_with_cursor(

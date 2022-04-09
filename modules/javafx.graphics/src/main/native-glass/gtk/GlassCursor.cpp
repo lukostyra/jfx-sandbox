@@ -25,6 +25,7 @@
 #include <com_sun_glass_ui_gtk_GtkCursor.h>
 
 #include <gdk/gdk.h>
+#include <X11/Xcursor/Xcursor.h>
 #include <stdlib.h>
 #include <jni.h>
 
