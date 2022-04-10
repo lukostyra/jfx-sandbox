@@ -720,7 +720,7 @@ void WindowContextBase::ungrab_focus() {
     }
 }
 
-void WindowContextBase::set_cursor(GdkCursor* cursor) {
+void WindowContextBase::set_cursor(Cursor cursor) {
 //TODO: XChangeActivePointerGrab.
 //    if (!is_in_drag()) {
 //        if (WindowContextBase::sm_mouse_drag_window) {
@@ -731,7 +731,7 @@ void WindowContextBase::set_cursor(GdkCursor* cursor) {
 //                    WindowContextBase::sm_grab_window->get_gdk_window(), cursor, TRUE);
 //        }
 //    }
-    gdk_window_set_cursor(gdk_window, cursor);
+    XDefineCursor(display, xwindow, cursor);
 }
 
 void WindowContextBase::set_background(float r, float g, float b) {
@@ -802,7 +802,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | FocusChangeMask
                | PropertyChangeMask;
 
-    display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+    display = X_CURRENT_DISPLAY;
     visual = DefaultVisual(display, DefaultScreen(display));
     glong xvisualID = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
 

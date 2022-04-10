@@ -310,6 +310,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
 //    GdkWindow *root = gdk_screen_get_root_window(default_gdk_screen);
 //    gdk_window_set_events(root, static_cast<GdkEventMask>(gdk_window_get_events(root) | GDK_PROPERTY_CHANGE_MASK));
     Display* display = gdk_x11_display_get_xdisplay(gdk_display_get_default());
+    X_CURRENT_DISPLAY = display;
     x11_monitor_events(display);
 }
 

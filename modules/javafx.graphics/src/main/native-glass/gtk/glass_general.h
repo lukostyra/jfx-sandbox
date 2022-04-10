@@ -127,9 +127,10 @@ private:
         int flag;
     } RunnableContext;
 
+    extern Display * X_CURRENT_DISPLAY;
     extern char const * const GDK_WINDOW_DATA_CONTEXT;
 
-    GdkCursor* get_native_cursor(int type);
+    Cursor get_native_cursor(int type);
 
     // JNI global references
     extern jclass jStringCls; // java.lang.String

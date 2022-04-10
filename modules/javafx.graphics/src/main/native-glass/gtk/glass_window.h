@@ -156,7 +156,7 @@ public:
     virtual void set_maximized(bool) = 0;
     virtual void set_icon(GdkPixbuf*) = 0;
     virtual void restack(bool) = 0;
-    virtual void set_cursor(GdkCursor*) = 0;
+    virtual void set_cursor(Cursor) = 0;
     virtual void set_modal(bool, WindowContext* parent = NULL) = 0;
     virtual void set_gravity(float, float) = 0;
     virtual void set_level(int) = 0;
@@ -275,7 +275,7 @@ public:
     bool grab_mouse_drag_focus();
     void ungrab_focus();
     void ungrab_mouse_drag_focus();
-    void set_cursor(GdkCursor*);
+    void set_cursor(Cursor);
     void set_level(int) {}
     void set_background(float, float, float);
 
