@@ -520,10 +520,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkWindow__1setCustomCursor
     (void)obj;
 
     WindowContext* ctx = JLONG_TO_WINDOW_CTX(ptr);
-//    GdkCursor *cursor = (GdkCursor*)JLONG_TO_PTR(env->GetLongField(jCursor, jCursorPtr));
-//
-    //TODO:
-    ctx->set_cursor(1);
+    Cursor *cursor = (Cursor*)JLONG_TO_PTR(env->GetLongField(jCursor, jCursorPtr));
+    ctx->set_cursor(*cursor);
 }
 
 /*

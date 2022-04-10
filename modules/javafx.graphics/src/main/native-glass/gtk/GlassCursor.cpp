@@ -32,6 +32,19 @@
 #include "com_sun_glass_ui_Cursor.h"
 #include "glass_general.h"
 
+//TODO: must XFreeCursor
+static Cursor create_x_cursor_form_data(Display *display, const char* data, int x, int y) {
+    XColor color;
+    color.red = color.green = color.blue = 0;
+
+    Pixmap pixmap = XCreateBitmapFromData(display, DefaultRootWindow(display), data, x, y);
+    Cursor cursor = XCreatePixmapCursor(display, pixmap, pixmap, &color, &color, 0, 0);
+
+    XFreePixmap(display, pixmap);
+
+    return cursor;
+}
+
 //See: https://www.freedesktop.org/wiki/Specifications/cursor-spec/
 Cursor get_native_cursor(int type) {
     Cursor cursor;
@@ -44,9 +57,12 @@ Cursor get_native_cursor(int type) {
             break;
         case com_sun_glass_ui_Cursor_CURSOR_CLOSED_HAND:
             cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "grabbing");
+            if (cursor == 0) {
+                cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "fleur");
+            }
             break;
-        case com_sun_glass_ui_Cursor_CURSOR_OPEN_HAND:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "grab");
+            case com_sun_glass_ui_Cursor_CURSOR_OPEN_HAND:
+            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "hand1");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_POINTING_HAND:
             cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "pointer");
@@ -58,7 +74,7 @@ Cursor get_native_cursor(int type) {
             cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "s-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_UPDOWN:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "col-resize");
+            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "ns-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_LEFT:
             cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "w-resize");
@@ -85,11 +101,14 @@ Cursor get_native_cursor(int type) {
             cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "move");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_WAIT:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "wait");
+            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "watch");
+            if (cursor == 0) {
+                cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "progress");
+            }
             break;
         case com_sun_glass_ui_Cursor_CURSOR_DISAPPEAR:
         case com_sun_glass_ui_Cursor_CURSOR_NONE:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "blank-cursor");
+            cursor = None;
             break;
         case com_sun_glass_ui_Cursor_CURSOR_DEFAULT:
         default:
@@ -113,14 +132,13 @@ JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkCursor__1createCursor
 {
     (void)obj;
 
-    GdkPixbuf *pixbuf = NULL;
-    GdkCursor *cursor = NULL;
-    env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&pixbuf));
+    Cursor cursor = 0;
+
+    long* data;
+    env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&data));
     if (!EXCEPTION_OCCURED(env)) {
-    //TODO: custom
-//        cursor = gdk_cursor_new_from_pixbuf(gdk_X_CURRENT_DISPLAY_get_default(), pixbuf, x, y);
+        cursor = create_x_cursor_form_data(X_CURRENT_DISPLAY, (char *) data, x, y);
     }
-    g_object_unref(pixbuf);
 
     return PTR_TO_JLONG(cursor);
 }
