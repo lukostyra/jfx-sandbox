@@ -31,6 +31,7 @@
 
 #include "com_sun_glass_ui_Cursor.h"
 #include "glass_general.h"
+static Cursor emptyCursor = 0;
 
 //TODO: must XFreeCursor
 static Cursor create_x_cursor_form_data(Display *display, const char* data, int x, int y) {
@@ -43,6 +44,15 @@ static Cursor create_x_cursor_form_data(Display *display, const char* data, int 
     XFreePixmap(display, pixmap);
 
     return cursor;
+}
+
+static Cursor get_empty_cursor() {
+    if (emptyCursor == 0) {
+        char data[1];
+        emptyCursor = create_x_cursor_form_data(X_CURRENT_DISPLAY, data, 1, 1);
+    }
+
+    return emptyCursor;
 }
 
 //See: https://www.freedesktop.org/wiki/Specifications/cursor-spec/
@@ -108,7 +118,7 @@ Cursor get_native_cursor(int type) {
             break;
         case com_sun_glass_ui_Cursor_CURSOR_DISAPPEAR:
         case com_sun_glass_ui_Cursor_CURSOR_NONE:
-            cursor = None;
+            cursor = get_empty_cursor();
             break;
         case com_sun_glass_ui_Cursor_CURSOR_DEFAULT:
         default:
