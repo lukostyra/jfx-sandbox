@@ -24,19 +24,14 @@
  */
 #include <stdlib.h>
 #include <string.h>
-#include <gdk/gdk.h>
-#include <cairo.h>
+//#include <gdk/gdk.h>
+//#include <cairo.h>
 #include <assert.h>
 #include <com_sun_glass_ui_gtk_GtkPixels.h>
-#include <gdk-pixbuf/gdk-pixbuf-core.h>
+//#include <gdk-pixbuf/gdk-pixbuf-core.h>
+#include <X11/Xlib.h>
 
 #include "glass_general.h"
-
-static void my_free(guchar *pixels, gpointer data) {
-    (void)data;
-
-    g_free(pixels);
-}
 
 extern "C" {
 
@@ -70,7 +65,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkPixels__1attachInt
     (void)obj;
 
     jint *data;
-    GdkPixbuf **pixbuf;
+    Pixmap *pixmap;
     guint8 *dataRGBA;
 
     if (array == NULL) {
@@ -81,10 +76,13 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkPixels__1attachInt
         data = (jint*) env->GetPrimitiveArrayCritical(array, 0);
     }
 
-    pixbuf = (GdkPixbuf**)JLONG_TO_PTR(ptr);
     dataRGBA = convert_BGRA_to_RGBA(data + offset, w*4, h);
-    *pixbuf = gdk_pixbuf_new_from_data(dataRGBA, GDK_COLORSPACE_RGB, TRUE, 8,
-                  w, h, w * 4, (GdkPixbufDestroyNotify) my_free, NULL);
+
+    pixmap = (Pixmap*)JLONG_TO_PTR(ptr);
+    int depth = DefaultDepth(X_CURRENT_DISPLAY, DefaultScreen(X_CURRENT_DISPLAY));
+    *pixmap = XCreatePixmapFromBitmapData(X_CURRENT_DISPLAY, DefaultRootWindow(X_CURRENT_DISPLAY), (char *) dataRGBA,
+                                          w, h, 0, 0, depth);
+
     if (array != NULL) {
         env->ReleasePrimitiveArrayCritical(array, data, 0);
     }
@@ -102,7 +100,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkPixels__1attachByte
     (void)obj;
 
     jbyte *data;
-    GdkPixbuf **pixbuf;
+    Pixmap *pixmap;
     guint8 *dataRGBA;
 
     if (array == NULL) {
@@ -113,10 +111,12 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkPixels__1attachByte
         data = (jbyte*) env->GetPrimitiveArrayCritical(array, 0);
     }
 
-    pixbuf = (GdkPixbuf**)JLONG_TO_PTR(ptr);
     dataRGBA = convert_BGRA_to_RGBA((const int*)(data + offset), w*4, h);
-    *pixbuf = gdk_pixbuf_new_from_data(dataRGBA, GDK_COLORSPACE_RGB, TRUE, 8,
-                  w, h, w * 4, (GdkPixbufDestroyNotify) my_free, NULL);
+    pixmap = (Pixmap*)JLONG_TO_PTR(ptr);
+    int depth = DefaultDepth(X_CURRENT_DISPLAY, DefaultScreen(X_CURRENT_DISPLAY));
+    *pixmap = XCreatePixmapFromBitmapData(X_CURRENT_DISPLAY, DefaultRootWindow(X_CURRENT_DISPLAY), (char *) dataRGBA,
+                                          w, h, 0, 0, depth);
+
     if (array != NULL) {
         env->ReleasePrimitiveArrayCritical(array, data, 0);
     }

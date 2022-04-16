@@ -587,11 +587,16 @@ void WindowContextBase::process_key(GdkEventKey* event) {
 }
 
 void WindowContextBase::paint(void* data, jint width, jint height) {
-    XImage* image = XCreateImage(display, visual, depth, ZPixmap, 0, (char*) data, width, height, 32, 0);
-    XPutImage(display, xwindow, DefaultGC(display, 0), image, 0, 0, 0, 0, width, height);
+    int depth = DefaultDepth(X_CURRENT_DISPLAY, DefaultScreen(X_CURRENT_DISPLAY));
+    Pixmap pixmap = XCreatePixmapFromBitmapData(display, DefaultRootWindow(display), (char *) data,width, height, 0, 0, depth);
+    XCopyPlane(display, pixmap, xwindow, DefaultGC(display, DefaultScreen(display)), 0, 0, width, height, 0, 0, 1);
 
-    //XPutImage probaly frees it, since this issues a double-free
-    //XDestroyImage(image);
+    XFlush(display);
+    XFreePixmap(display, pixmap);
+
+//    XImage* image = XCreateImage(display, visual, depth, ZPixmap, 0, (char*) data, width, height, 32, 0);
+//    XPutImage(display, xwindow, DefaultGC(display, DefaultScreen(display)), image, 0, 0, 0, 0, width, height);
+//    XDestroyImage(image);
 }
 
 void WindowContextBase::add_child(WindowContextTop* child) {

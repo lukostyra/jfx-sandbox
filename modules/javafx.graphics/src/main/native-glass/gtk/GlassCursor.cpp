@@ -32,24 +32,14 @@
 #include "com_sun_glass_ui_Cursor.h"
 #include "glass_general.h"
 static Cursor emptyCursor = 0;
-
-//TODO: must XFreeCursor
-static Cursor create_x_cursor_form_data(Display *display, const char* data, int x, int y) {
-    XColor color;
-    color.red = color.green = color.blue = 0;
-
-    Pixmap pixmap = XCreateBitmapFromData(display, DefaultRootWindow(display), data, x, y);
-    Cursor cursor = XCreatePixmapCursor(display, pixmap, pixmap, &color, &color, 0, 0);
-
-    XFreePixmap(display, pixmap);
-
-    return cursor;
-}
-
 static Cursor get_empty_cursor() {
     if (emptyCursor == 0) {
+        XColor color;
         char data[1];
-        emptyCursor = create_x_cursor_form_data(X_CURRENT_DISPLAY, data, 1, 1);
+        Pixmap pixmap = XCreateBitmapFromData(X_CURRENT_DISPLAY, DefaultRootWindow(X_CURRENT_DISPLAY), data, 1, 1);
+        emptyCursor = XCreatePixmapCursor(X_CURRENT_DISPLAY, pixmap, pixmap, &color, &color, 0, 0);
+
+        XFreePixmap(X_CURRENT_DISPLAY, pixmap);
     }
 
     return emptyCursor;
@@ -144,13 +134,18 @@ JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkCursor__1createCursor
 
     Cursor cursor = 0;
 
-    long* data;
-    env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&data));
+    Pixmap pixmap;
+    env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&pixmap));
+
     if (!EXCEPTION_OCCURED(env)) {
-        cursor = create_x_cursor_form_data(X_CURRENT_DISPLAY, (char *) data, x, y);
+        XColor color;
+        g_print("XCreatePixmapCursor %ld\n", pixmap);
+        cursor = XCreatePixmapCursor(X_CURRENT_DISPLAY, pixmap, pixmap, &color, &color, x, y);
     }
 
-    return PTR_TO_JLONG(cursor);
+    XFreePixmap(X_CURRENT_DISPLAY, pixmap);
+
+    return PTR_TO_JLONG(&cursor);
 }
 
 /*
@@ -166,8 +161,6 @@ JNIEXPORT jobject JNICALL Java_com_sun_glass_ui_gtk_GtkCursor__1getBestSize
     (void)height;
 
     int size = XcursorGetDefaultSize(X_CURRENT_DISPLAY);
-
-    g_print("Java_com_sun_glass_ui_gtk_GtkCursor__1getBestSize: %d\n", size);
 
     jclass jc = env->FindClass("com/sun/glass/ui/Size");
     if (env->ExceptionCheck()) return NULL;
