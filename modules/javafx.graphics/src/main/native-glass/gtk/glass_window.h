@@ -83,7 +83,7 @@ struct WindowFrameExtents {
     int right;
 };
 
-static const guint MOUSE_BUTTONS_MASK = (guint) (GDK_BUTTON1_MASK | GDK_BUTTON2_MASK | GDK_BUTTON3_MASK);
+static const guint MOUSE_BUTTONS_MASK = (guint) (Button1Mask | Button2Mask | Button3Mask);
 
 enum BoundsType {
     BOUNDSTYPE_CONTENT,
@@ -172,10 +172,8 @@ public:
     virtual void process_delete() = 0;
     virtual void process_expose(XExposeEvent *) = 0;
     virtual void process_damage(XDamageNotifyEvent *) = 0;
-    virtual void process_mouse_button(GdkEventButton*) = 0;
     virtual void process_mouse_button(XButtonEvent*) = 0;
     virtual void process_mouse_motion(XMotionEvent *) = 0;
-    virtual void process_mouse_scroll(GdkEventScroll*) = 0;
     virtual void process_mouse_cross(XCrossingEvent*) = 0;
     virtual void process_key(GdkEventKey*) = 0;
     virtual void process_state(GdkEventWindowState*) = 0;
@@ -277,10 +275,8 @@ public:
     void process_delete();
     void process_expose(XExposeEvent *);
     void process_damage(XDamageNotifyEvent *);
-    void process_mouse_button(GdkEventButton*);
     void process_mouse_button(XButtonEvent*);
     void process_mouse_motion(XMotionEvent*);
-    void process_mouse_scroll(GdkEventScroll*);
     void process_mouse_cross(XCrossingEvent*);
     void process_key(GdkEventKey*);
     void process_state(GdkEventWindowState*);

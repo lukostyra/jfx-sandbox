@@ -262,7 +262,7 @@ void WindowContextBase::process_damage(XDamageNotifyEvent* event) {
     }
 }
 
-static inline jint gtk_button_number_to_mouse_button(guint button) {
+static inline jint xlib_button_number_to_mouse_button(guint button) {
     switch (button) {
         case 1:
             return com_sun_glass_events_MouseEvent_BUTTON_LEFT;
@@ -282,56 +282,24 @@ static inline jint gtk_button_number_to_mouse_button(guint button) {
 
 void WindowContextBase::process_mouse_button(XButtonEvent *event) {
     bool press = event->type == ButtonPress;
+    jint state = xlib_modifier_mask_to_glass(event->state);
 
-    jint button = gtk_button_number_to_mouse_button(event->button);
-
-    //TODO: modifier
-    int keymask = 0;
-
-    if (jview && button != com_sun_glass_events_MouseEvent_BUTTON_NONE) {
-        mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
-                press ? com_sun_glass_events_MouseEvent_DOWN : com_sun_glass_events_MouseEvent_UP,
-                button,
-                (jint) event->x, (jint) event->y,
-                (jint) event->x_root, (jint) event->y_root,
-                keymask,
-                (event->button == 3 && press) ? JNI_TRUE : JNI_FALSE,
-                JNI_FALSE);
-        CHECK_JNI_EXCEPTION(mainEnv)
-
-        if (jview && event->button == 3 && press) {
-            mainEnv->CallVoidMethod(jview, jViewNotifyMenu,
-                    (jint)event->x, (jint)event->y,
-                    (jint)event->x_root, (jint)event->y_root,
-                    JNI_FALSE);
-            CHECK_JNI_EXCEPTION(mainEnv)
-        }
-    }
-}
-
-void WindowContextBase::process_mouse_button(GdkEventButton* event) {
-    bool press = event->type == GDK_BUTTON_PRESS;
-    guint state = event->state;
-    guint mask = 0;
-
-    // We need to add/remove current mouse button from the modifier flags
-    // as X lib state represents the state just prior to the event and
-    // glass needs the state just after the event
+    int mask = 0;
     switch (event->button) {
         case 1:
-            mask = GDK_BUTTON1_MASK;
+            mask = Button1Mask;
             break;
         case 2:
-            mask = GDK_BUTTON2_MASK;
+            mask = Button2Mask;
             break;
         case 3:
-            mask = GDK_BUTTON3_MASK;
+            mask = Button3Mask;
             break;
-        case MOUSE_BACK_BTN:
-            mask = GDK_BUTTON4_MASK;
+        case 4:
+            mask = Button4Mask;
             break;
-        case MOUSE_FORWARD_BTN:
-            mask = GDK_BUTTON5_MASK;
+        case 5:
+            mask = Button5Mask;
             break;
     }
 
@@ -341,37 +309,34 @@ void WindowContextBase::process_mouse_button(GdkEventButton* event) {
         state &= ~mask;
     }
 
-    if (press) {
-        GdkDevice* device = event->device;
+    g_print("Mouse button %d\n", event->button);
+    //scroll
+    if (event->button == 4 || event->button == 5) {
+        jdouble dx = 0;
+        jdouble dy = (event->button == 4) ? 1 : -1;
 
-        if (glass_gdk_device_is_grabbed(device)
-                && (glass_gdk_device_get_window_at_position(device, NULL, NULL)
-                == NULL)) {
-            ungrab_focus();
-            return;
+        if (event->state & ShiftMask) {
+            jdouble t = dy;
+            dy = dx;
+            dx = t;
         }
+
+        if (jview) {
+            mainEnv->CallVoidMethod(jview, jViewNotifyScroll,
+                    (jint) event->x, (jint) event->y,
+                    (jint) event->x_root, (jint) event->y_root,
+                    dx, dy, state,
+                    (jint) 0, (jint) 0,
+                    (jint) 0, (jint) 0,
+                    (jdouble) 40.0, (jdouble) 40.0);
+            CHECK_JNI_EXCEPTION(mainEnv)
+        }
+
+        return;
     }
 
-    // Upper layers expects from us Windows behavior:
-    // all mouse events should be delivered to window where drag begins
-    // and no exit/enter event should be reported during this drag.
-    // We can grab mouse pointer for these needs.
-    if (press) {
-        grab_mouse_drag_focus();
-    } else {
-        if ((event->state & MOUSE_BUTTONS_MASK)
-            && !(state & MOUSE_BUTTONS_MASK)) { // all buttons released
-            ungrab_mouse_drag_focus();
-        } else if (event->button == 8 || event->button == 9) {
-            // GDK X backend interprets button press events for buttons 4-7 as
-            // scroll events so GDK_BUTTON4_MASK and GDK_BUTTON5_MASK will never
-            // be set on the event->state from GDK. Thus we cannot check if all
-            // buttons have been released in the usual way (as above).
-            ungrab_mouse_drag_focus();
-        }
-    }
+    jint button = xlib_button_number_to_mouse_button(event->button);
 
-    jint button = gtk_button_number_to_mouse_button(event->button);
 
     if (jview && button != com_sun_glass_events_MouseEvent_BUTTON_NONE) {
         mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
@@ -379,7 +344,7 @@ void WindowContextBase::process_mouse_button(GdkEventButton* event) {
                 button,
                 (jint) event->x, (jint) event->y,
                 (jint) event->x_root, (jint) event->y_root,
-                gdk_modifier_mask_to_glass(state),
+                state,
                 (event->button == 3 && press) ? JNI_TRUE : JNI_FALSE,
                 JNI_FALSE);
         CHECK_JNI_EXCEPTION(mainEnv)
@@ -394,8 +359,9 @@ void WindowContextBase::process_mouse_button(GdkEventButton* event) {
     }
 }
 
+
 void WindowContextBase::process_mouse_motion(XMotionEvent* event) {
-    jint glass_modifier = gdk_modifier_mask_to_glass(event->state);
+    jint glass_modifier = xlib_modifier_mask_to_glass(event->state);
 
     jint isDrag = glass_modifier & (
             com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_PRIMARY |
@@ -417,6 +383,7 @@ void WindowContextBase::process_mouse_motion(XMotionEvent* event) {
         button = com_sun_glass_events_MouseEvent_BUTTON_FORWARD;
     }
 
+    g_print("Mouse motion %d, %d, %d, %d\n", event->x_root, event->y_root, event->x, event->y);
     if (jview) {
         mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
                 isDrag ? com_sun_glass_events_MouseEvent_DRAG : com_sun_glass_events_MouseEvent_MOVE,
@@ -428,49 +395,6 @@ void WindowContextBase::process_mouse_motion(XMotionEvent* event) {
                 JNI_FALSE);
         CHECK_JNI_EXCEPTION(mainEnv)
     }
-}
-
-void WindowContextBase::process_mouse_scroll(GdkEventScroll* event) {
-    jdouble dx = 0;
-    jdouble dy = 0;
-
-    // converting direction to change in pixels
-    switch (event->direction) {
-#if GTK_CHECK_VERSION(3, 4, 0)
-        case GDK_SCROLL_SMOOTH:
-            //FIXME 3.4 ???
-            break;
-#endif
-        case GDK_SCROLL_UP:
-            dy = 1;
-            break;
-        case GDK_SCROLL_DOWN:
-            dy = -1;
-            break;
-        case GDK_SCROLL_LEFT:
-            dx = 1;
-            break;
-        case GDK_SCROLL_RIGHT:
-            dx = -1;
-            break;
-    }
-    if (event->state & GDK_SHIFT_MASK) {
-        jdouble t = dy;
-        dy = dx;
-        dx = t;
-    }
-    if (jview) {
-        mainEnv->CallVoidMethod(jview, jViewNotifyScroll,
-                (jint) event->x, (jint) event->y,
-                (jint) event->x_root, (jint) event->y_root,
-                dx, dy,
-                gdk_modifier_mask_to_glass(event->state),
-                (jint) 0, (jint) 0,
-                (jint) 0, (jint) 0,
-                (jdouble) 40.0, (jdouble) 40.0);
-        CHECK_JNI_EXCEPTION(mainEnv)
-    }
-
 }
 
 void WindowContextBase::process_mouse_cross(XCrossingEvent* event) {
@@ -489,7 +413,7 @@ void WindowContextBase::process_mouse_cross(XCrossingEvent* event) {
                     com_sun_glass_events_MouseEvent_BUTTON_NONE,
                     (jint) event->x, (jint) event->y,
                     (jint) event->x_root, (jint) event->y_root,
-                    gdk_modifier_mask_to_glass(state),
+                    xlib_modifier_mask_to_glass(state),
                     JNI_FALSE,
                     JNI_FALSE);
             CHECK_JNI_EXCEPTION(mainEnv)
@@ -498,71 +422,71 @@ void WindowContextBase::process_mouse_cross(XCrossingEvent* event) {
 }
 
 void WindowContextBase::process_key(GdkEventKey* event) {
-    bool press = event->type == GDK_KEY_PRESS;
-    jint glassKey = get_glass_key(event);
-    jint glassModifier = gdk_modifier_mask_to_glass(event->state);
-    if (press) {
-        glassModifier |= glass_key_to_modifier(glassKey);
-    } else {
-        glassModifier &= ~glass_key_to_modifier(glassKey);
-    }
-    jcharArray jChars = NULL;
-    jchar key = gdk_keyval_to_unicode(event->keyval);
-    if (key >= 'a' && key <= 'z' && (event->state & GDK_CONTROL_MASK)) {
-        key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
-    } else {
-#ifdef GLASS_GTK2
-        if (key == 0) {
-            // Work around "bug" fixed in gtk-3.0:
-            // http://mail.gnome.org/archives/commits-list/2011-March/msg06832.html
-            switch (event->keyval) {
-            case 0xFF08 /* Backspace */: key =  '\b';
-            case 0xFF09 /* Tab       */: key =  '\t';
-            case 0xFF0A /* Linefeed  */: key =  '\n';
-            case 0xFF0B /* Vert. Tab */: key =  '\v';
-            case 0xFF0D /* Return    */: key =  '\r';
-            case 0xFF1B /* Escape    */: key =  '\033';
-            case 0xFFFF /* Delete    */: key =  '\177';
-            }
-        }
-#endif
-    }
-
-    if (key > 0) {
-        jChars = mainEnv->NewCharArray(1);
-        if (jChars) {
-            mainEnv->SetCharArrayRegion(jChars, 0, 1, &key);
-            CHECK_JNI_EXCEPTION(mainEnv)
-        }
-    } else {
-        jChars = mainEnv->NewCharArray(0);
-    }
-    if (jview) {
-        if (press) {
-            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-                    com_sun_glass_events_KeyEvent_PRESS,
-                    glassKey,
-                    jChars,
-                    glassModifier);
-            CHECK_JNI_EXCEPTION(mainEnv)
-
-            if (jview && key > 0) { // TYPED events should only be sent for printable characters.
-                mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-                        com_sun_glass_events_KeyEvent_TYPED,
-                        com_sun_glass_events_KeyEvent_VK_UNDEFINED,
-                        jChars,
-                        glassModifier);
-                CHECK_JNI_EXCEPTION(mainEnv)
-            }
-        } else {
-            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-                    com_sun_glass_events_KeyEvent_RELEASE,
-                    glassKey,
-                    jChars,
-                    glassModifier);
-            CHECK_JNI_EXCEPTION(mainEnv)
-        }
-    }
+//    bool press = event->type == GDK_KEY_PRESS;
+//    jint glassKey = get_glass_key(event);
+//    jint glassModifier = gdk_modifier_mask_to_glass(event->state);
+//    if (press) {
+//        glassModifier |= glass_key_to_modifier(glassKey);
+//    } else {
+//        glassModifier &= ~glass_key_to_modifier(glassKey);
+//    }
+//    jcharArray jChars = NULL;
+//    jchar key = gdk_keyval_to_unicode(event->keyval);
+//    if (key >= 'a' && key <= 'z' && (event->state & GDK_CONTROL_MASK)) {
+//        key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
+//    } else {
+//#ifdef GLASS_GTK2
+//        if (key == 0) {
+//            // Work around "bug" fixed in gtk-3.0:
+//            // http://mail.gnome.org/archives/commits-list/2011-March/msg06832.html
+//            switch (event->keyval) {
+//            case 0xFF08 /* Backspace */: key =  '\b';
+//            case 0xFF09 /* Tab       */: key =  '\t';
+//            case 0xFF0A /* Linefeed  */: key =  '\n';
+//            case 0xFF0B /* Vert. Tab */: key =  '\v';
+//            case 0xFF0D /* Return    */: key =  '\r';
+//            case 0xFF1B /* Escape    */: key =  '\033';
+//            case 0xFFFF /* Delete    */: key =  '\177';
+//            }
+//        }
+//#endif
+//    }
+//
+//    if (key > 0) {
+//        jChars = mainEnv->NewCharArray(1);
+//        if (jChars) {
+//            mainEnv->SetCharArrayRegion(jChars, 0, 1, &key);
+//            CHECK_JNI_EXCEPTION(mainEnv)
+//        }
+//    } else {
+//        jChars = mainEnv->NewCharArray(0);
+//    }
+//    if (jview) {
+//        if (press) {
+//            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+//                    com_sun_glass_events_KeyEvent_PRESS,
+//                    glassKey,
+//                    jChars,
+//                    glassModifier);
+//            CHECK_JNI_EXCEPTION(mainEnv)
+//
+//            if (jview && key > 0) { // TYPED events should only be sent for printable characters.
+//                mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+//                        com_sun_glass_events_KeyEvent_TYPED,
+//                        com_sun_glass_events_KeyEvent_VK_UNDEFINED,
+//                        jChars,
+//                        glassModifier);
+//                CHECK_JNI_EXCEPTION(mainEnv)
+//            }
+//        } else {
+//            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+//                    com_sun_glass_events_KeyEvent_RELEASE,
+//                    glassKey,
+//                    jChars,
+//                    glassModifier);
+//            CHECK_JNI_EXCEPTION(mainEnv)
+//        }
+//    }
 }
 
 void WindowContextBase::paint(void* data, jint width, jint height) {
