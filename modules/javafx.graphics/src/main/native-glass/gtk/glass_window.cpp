@@ -141,9 +141,6 @@ void WindowContextBase::process_visibility(XVisibilityEvent* event) {
     g_print("Visibility %d\n", visibility_state);
 }
 
-void WindowContextBase::process_focus(GdkEventFocus* event) {
-}
-
 void WindowContextBase::process_focus(XFocusChangeEvent* event) {
     bool in = event->type == FocusIn;
 
@@ -245,13 +242,6 @@ void WindowContextBase::process_destroy() {
 void WindowContextBase::process_delete() {
     if (jwindow && isEnabled()) {
         mainEnv->CallVoidMethod(jwindow, jWindowNotifyClose);
-        CHECK_JNI_EXCEPTION(mainEnv)
-    }
-}
-
-void WindowContextBase::process_expose(GdkEventExpose* event) {
-    if (jview) {
-        mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->area.x, event->area.y, event->area.width, event->area.height);
         CHECK_JNI_EXCEPTION(mainEnv)
     }
 }
@@ -404,9 +394,6 @@ void WindowContextBase::process_mouse_button(GdkEventButton* event) {
     }
 }
 
-void WindowContextBase::process_mouse_motion(GdkEventMotion* event) {
-}
-
 void WindowContextBase::process_mouse_motion(XMotionEvent* event) {
     jint glass_modifier = gdk_modifier_mask_to_glass(event->state);
 
@@ -483,10 +470,6 @@ void WindowContextBase::process_mouse_scroll(GdkEventScroll* event) {
                 (jdouble) 40.0, (jdouble) 40.0);
         CHECK_JNI_EXCEPTION(mainEnv)
     }
-
-}
-
-void WindowContextBase::process_mouse_cross(GdkEventCrossing* event) {
 
 }
 

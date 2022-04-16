@@ -167,19 +167,15 @@ public:
     virtual void process_configure(GdkEventConfigure*) = 0;
     virtual void process_configure(XConfigureEvent*) = 0;
     virtual void process_map() = 0;
-    virtual void process_focus(GdkEventFocus*) = 0;
     virtual void process_focus(XFocusChangeEvent*) = 0;
     virtual void process_destroy() = 0;
     virtual void process_delete() = 0;
-    virtual void process_expose(GdkEventExpose*) = 0;
     virtual void process_expose(XExposeEvent *) = 0;
     virtual void process_damage(XDamageNotifyEvent *) = 0;
     virtual void process_mouse_button(GdkEventButton*) = 0;
     virtual void process_mouse_button(XButtonEvent*) = 0;
-    virtual void process_mouse_motion(GdkEventMotion*) = 0;
     virtual void process_mouse_motion(XMotionEvent *) = 0;
     virtual void process_mouse_scroll(GdkEventScroll*) = 0;
-    virtual void process_mouse_cross(GdkEventCrossing*) = 0;
     virtual void process_mouse_cross(XCrossingEvent*) = 0;
     virtual void process_key(GdkEventKey*) = 0;
     virtual void process_state(GdkEventWindowState*) = 0;
@@ -276,19 +272,15 @@ public:
     void set_background(float, float, float);
 
     void process_map() {}
-    void process_focus(GdkEventFocus*);
     void process_focus(XFocusChangeEvent*);
     void process_destroy();
     void process_delete();
-    void process_expose(GdkEventExpose*);
     void process_expose(XExposeEvent *);
     void process_damage(XDamageNotifyEvent *);
     void process_mouse_button(GdkEventButton*);
     void process_mouse_button(XButtonEvent*);
-    void process_mouse_motion(GdkEventMotion*);
     void process_mouse_motion(XMotionEvent*);
     void process_mouse_scroll(GdkEventScroll*);
-    void process_mouse_cross(GdkEventCrossing*);
     void process_mouse_cross(XCrossingEvent*);
     void process_key(GdkEventKey*);
     void process_state(GdkEventWindowState*);
