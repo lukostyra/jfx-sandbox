@@ -270,7 +270,7 @@ jint get_glass_key(GdkEventKey* e) {
 }
 
 gint find_gdk_keyval_for_glass_keycode(jint code) {
-    gint result = -1;
+            gint result = -1;
     GHashTableIter iter;
     gpointer key, value;
     init_keymap();
@@ -296,7 +296,7 @@ jint xlib_modifier_mask_to_glass(guint mask)
     glass_mask |= (mask & Button3Mask) ? com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_SECONDARY : 0;
     glass_mask |= (mask & Button4Mask) ? com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_BACK : 0;
     glass_mask |= (mask & Button5Mask) ? com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_FORWARD : 0;
-//TODO: glass_mask |= (mask & GDK_SUPER_MASK) ? com_sun_glass_events_KeyEvent_MODIFIER_WINDOWS : 0; // XXX: is this OK?
+    glass_mask |= (mask & Mod4Mask) ? com_sun_glass_events_KeyEvent_MODIFIER_WINDOWS : 0; // XXX: is this OK?
 
     return glass_mask;
 }
