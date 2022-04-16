@@ -192,8 +192,6 @@ public:
     virtual void remove_child(WindowContextTop* child) = 0;
     virtual bool set_view(jobject) = 0;
 
-    virtual GdkWindow *get_gdk_window() = 0;
-    virtual GtkWindow *get_gtk_window() = 0;
     virtual XID get_window_xid() = 0;
     virtual jobject get_jview() = 0;
     virtual jobject get_jwindow() = 0;
@@ -219,8 +217,6 @@ protected:
     std::set<WindowContextTop*> children;
     jobject jwindow;
     jobject jview;
-    GtkWidget* gtk_widget;
-    GdkWindow* gdk_window;
     Window xwindow;
     Window xparent;
     Display* display;

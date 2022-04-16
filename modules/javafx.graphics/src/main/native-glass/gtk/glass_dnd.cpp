@@ -160,7 +160,7 @@ static void process_dnd_target_drag_enter(WindowContext *ctx, GdkEventDND *event
     reset_enter_ctx();
     enter_ctx.ctx = event->context;
     enter_ctx.just_entered = TRUE;
-    gdk_window_get_origin(ctx->get_gdk_window(), &enter_ctx.dx, &enter_ctx.dy);
+//    gdk_window_get_origin(ctx->get_gdk_window(), &enter_ctx.dx, &enter_ctx.dy);
     is_dnd_owner = is_in_drag();
 }
 

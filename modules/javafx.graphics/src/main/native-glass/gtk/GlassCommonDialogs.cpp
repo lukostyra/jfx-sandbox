@@ -65,11 +65,11 @@ static void jstring_to_utf_release(JNIEnv *env, jstring jstr,
     }
 }
 
-static GtkWindow *gdk_window_handle_to_gtk(jlong handle) {
-    return  (handle != 0)
-                ? ((WindowContext*)JLONG_TO_PTR(handle))->get_gtk_window()
-                : NULL;
-}
+//static GtkWindow *gdk_window_handle_to_gtk(jlong handle) {
+//    return  (handle != 0)
+//                ? ((WindowContext*)JLONG_TO_PTR(handle))->get_gtk_window()
+//                : NULL;
+//}
 
 static jobject create_empty_result() {
     jclass jFileChooserResult = (jclass) mainEnv->FindClass("com/sun/glass/ui/CommonDialogs$FileChooserResult");
@@ -112,7 +112,7 @@ JNIEXPORT jobject JNICALL Java_com_sun_glass_ui_gtk_GtkCommonDialogs__1showFileC
         return create_empty_result();
     }
 
-    GtkWidget* chooser = gtk_file_chooser_dialog_new(chooser_title, gdk_window_handle_to_gtk(parent),
+    GtkWidget* chooser = gtk_file_chooser_dialog_new(chooser_title, NULL, //gdk_window_handle_to_gtk(parent),
             static_cast<GtkFileChooserAction>(chooser_type),
             GTK_STOCK_CANCEL,
             GTK_RESPONSE_CANCEL,
@@ -208,7 +208,8 @@ JNIEXPORT jstring JNICALL Java_com_sun_glass_ui_gtk_GtkCommonDialogs__1showFolde
 
     GtkWidget* chooser = gtk_file_chooser_dialog_new(
             chooser_title,
-            gdk_window_handle_to_gtk(parent),
+            NULL,
+//            gdk_window_handle_to_gtk(parent),
             GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER,
             GTK_STOCK_CANCEL,
             GTK_RESPONSE_CANCEL,

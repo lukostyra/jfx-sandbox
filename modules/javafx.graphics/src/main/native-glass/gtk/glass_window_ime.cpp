@@ -62,7 +62,7 @@ bool WindowContextBase::im_filter_keypress(GdkEventKey* event) {
     KeySym keysym;
     Status status;
     XKeyPressedEvent xevent = convert_event(event);
-    if (XFilterEvent((XEvent*) & xevent, GDK_WINDOW_XID(gdk_window))) {
+    if (XFilterEvent((XEvent*) & xevent, xwindow)) {
         return TRUE;
     }
 
@@ -221,7 +221,6 @@ static XIMStyle get_best_supported_style(XIM im_xim)
 }
 
 void WindowContextBase::enableOrResetIME() {
-    Display *display = gdk_x11_display_get_xdisplay(gdk_window_get_display(gdk_window));
     if (xim.im == NULL || xim.ic == NULL) {
         xim.im = XOpenIM(display, NULL, NULL, NULL);
         if (xim.im == NULL) {
@@ -247,7 +246,7 @@ void WindowContextBase::enableOrResetIME() {
 
         xim.ic = XCreateIC(xim.im,
                 XNInputStyle, styles,
-                XNClientWindow, GDK_WINDOW_XID(gdk_window),
+                XNClientWindow, xwindow,
                 XNPreeditAttributes, list,
                 NULL);
 
