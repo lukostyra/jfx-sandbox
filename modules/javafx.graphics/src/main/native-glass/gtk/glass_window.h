@@ -365,7 +365,7 @@ private:
     bool get_frame_extents_property(int *, int *, int *, int *);
     void activate_window();
     void update_frame_extents();
-    void request_frame_extents();
+//    void request_frame_extents();
     void window_configure(XWindowChanges *, unsigned int);
     void update_window_constraints();
     void update_ontop_tree(bool);

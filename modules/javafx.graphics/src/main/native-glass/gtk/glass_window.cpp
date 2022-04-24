@@ -724,6 +724,8 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
         g_print("Fail to save context\n");
     }
 
+    g_print("X WINDOW ID = %ld\n", xwindow);
+
     Atom type_atom;
     switch (type) {
         case UTILITY:
@@ -774,7 +776,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
     XFlush(display);
 
-    request_frame_extents();
+//    request_frame_extents();
 
 //    gdk_window_register_dnd(gdk_window);
 }
@@ -812,31 +814,35 @@ void WindowContextTop::activate_window() {
 //    }
 }
 
-void WindowContextTop::request_frame_extents() {
-    if (frame_type != TITLED) {
-        return;
-    }
-
-    g_print("_NET_REQUEST_FRAME_EXTENTS\n");
-
-    Atom reqAtom = XInternAtom(display, "_NET_REQUEST_FRAME_EXTENTS", True);
-
-    XClientMessageEvent clientMessage;
-    memset(&clientMessage, 0, sizeof(clientMessage));
-
-    clientMessage.type = ClientMessage;
-    clientMessage.window = xwindow;
-    clientMessage.message_type = reqAtom;
-    clientMessage.format = 32;
-
-    XSendEvent(display, DefaultRootWindow(display), False,
-               SubstructureRedirectMask | SubstructureNotifyMask,
-               (XEvent *) &clientMessage);
-
-    XFlush(display);
-}
+//void WindowContextTop::request_frame_extents() {
+//    if (frame_type != TITLED) {
+//        return;
+//    }
+//
+//    g_print("_NET_REQUEST_FRAME_EXTENTS\n");
+//
+//    Atom extents_request_atom = XInternAtom(display, "_NET_REQUEST_FRAME_EXTENTS", True);
+//    XEvent xevent;
+//
+//    xevent.xclient.type = ClientMessage;
+//    xevent.xclient.message_type = extents_request_atom;
+//    xevent.xclient.display = display;
+//    xevent.xclient.window = xwindow;
+//    xevent.xclient.format = 32;
+//    xevent.xclient.data.l[0] = 0;
+//    xevent.xclient.data.l[1] = 0;
+//    xevent.xclient.data.l[2] = 0;
+//    xevent.xclient.data.l[3] = 0;
+//    xevent.xclient.data.l[4] = 0;
+//
+//    XSendEvent(display, DefaultRootWindow(display), False,
+//               SubstructureRedirectMask | SubstructureNotifyMask, &xevent);
+//
+//    XFlush(display);
+//}
 
 void WindowContextTop::update_frame_extents() {
+    g_print("update_frame_extents()\n");
     Atom frame_extents_atom = XInternAtom(display, "_NET_FRAME_EXTENTS", True);
     bool changed = false;
     long top, left, bottom, right;
@@ -849,6 +855,7 @@ void WindowContextTop::update_frame_extents() {
 
     if (XGetWindowProperty(display, xwindow, frame_extents_atom, 0, G_MAXLONG, False, XA_CARDINAL, &type_return,
                             &format_return, &nitems_return, &bytes_after_return, &data) == Success) {
+        g_print("update_frame_extents()->got property, %d, %ld\n", format_return, nitems_return);
         if (type_return == XA_CARDINAL && format_return == 32 && nitems_return == 4 && data) {
             long* extents = (long *) data;
             left = extents[0];
@@ -1017,7 +1024,7 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
 }
 
 void WindowContextTop::update_window_constraints() {
-//    g_print("update_window_constraints\n");
+    g_print("update_window_constraints\n");
     XSizeHints* hints = XAllocSizeHints();
 
     if (resizable.value) {
@@ -1027,10 +1034,10 @@ void WindowContextTop::update_window_constraints() {
         hints->min_height = (resizable.minh == -1) ? 1
                             : resizable.minh - geometry.extents.top - geometry.extents.bottom;
 
-        hints->max_width = (resizable.maxw == -1) ? 100000
+        hints->max_width = (resizable.maxw == -1) ? G_MAXINT
                             : resizable.maxw - geometry.extents.left - geometry.extents.right;
 
-        hints->max_height = (resizable.maxh == -1) ? 100000
+        hints->max_height = (resizable.maxh == -1) ? G_MAXINT
                            : resizable.maxh - geometry.extents.top - geometry.extents.bottom;
 
     } else {
@@ -1043,7 +1050,14 @@ void WindowContextTop::update_window_constraints() {
         hints->max_height = h;
     }
 
-    hints->flags = (PMinSize | PMaxSize);
+    hints->win_gravity = NorthWestGravity;
+    hints->flags = (PMinSize | PMaxSize | PWinGravity);
+
+    if (!map_received) {
+        hints->x = geometry_get_window_x(&geometry);
+        hints->y = geometry_get_window_y(&geometry);
+        hints->flags |= PPosition;
+    }
 
     XSetWMNormalHints(display, xwindow, hints);
     XFree(hints);
@@ -1067,6 +1081,7 @@ void WindowContextTop::set_visible(bool visible) {
 
 void WindowContextTop::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h, int cw, int ch) {
     g_print("set_bounds: %d, %d, %d, %d, %d, %d\n", x, y, w, h, cw, ch);
+    update_frame_extents();
 
     requested_bounds.width = w;
     requested_bounds.height = h;
@@ -1135,18 +1150,10 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         return;
     }
 
+    update_window_constraints();
+
     if (windowChangesMask & (CWX | CWY)) {
-        //FIXME: for some reason this is not consistent
         if (!map_received) {
-            XSizeHints* hints = XAllocSizeHints();
-            hints->x = windowChanges->x;
-            hints->y = windowChanges->y;
-            hints->flags = PPosition;
-            XSetWMNormalHints(display, xwindow, hints);
-            g_print("XSetWMNormalHints PPosition: %d, %d\n", hints->x, hints->y);
-            XFree(hints);
-
-
             notify_window_move();
         }
 
