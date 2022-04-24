@@ -144,7 +144,7 @@ void WindowContextBase::process_focus(XFocusChangeEvent* event) {
 
     if (jwindow) {
         if (!in || isEnabled()) {
-//            g_print("jWindowNotifyFocus\n");
+            g_print("jWindowNotifyFocus\n");
             mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus,
                         in ? com_sun_glass_events_WindowEvent_FOCUS_GAINED : com_sun_glass_events_WindowEvent_FOCUS_LOST);
             CHECK_JNI_EXCEPTION(mainEnv)
@@ -254,9 +254,9 @@ static inline jint xlib_button_number_to_mouse_button(guint button) {
         case 3:
             return com_sun_glass_events_MouseEvent_BUTTON_RIGHT;
         case 4:
-            return com_sun_glass_events_MouseEvent_BUTTON_BACK;
-        case 5:
             return com_sun_glass_events_MouseEvent_BUTTON_FORWARD;
+        case 5:
+            return com_sun_glass_events_MouseEvent_BUTTON_BACK;
         default:
             // Other buttons are not supported by quantum and are not reported by other platforms
             return com_sun_glass_events_MouseEvent_BUTTON_NONE;
@@ -320,8 +320,8 @@ void WindowContextBase::process_mouse_button(XButtonEvent *event) {
 
     jint button = xlib_button_number_to_mouse_button(event->button);
 
-
     if (jview && button != com_sun_glass_events_MouseEvent_BUTTON_NONE) {
+        g_print("jViewNotifyMouse press=%d, btn=%d, x,y=%d,%d\n", press, button, event->x, event->y);
         mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
                 press ? com_sun_glass_events_MouseEvent_DOWN : com_sun_glass_events_MouseEvent_UP,
                 button,
@@ -724,26 +724,41 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
         g_print("Fail to save context\n");
     }
 
+    Atom protocols[3] = { XInternAtom(display, "WM_DELETE_WINDOW", True),
+                          XInternAtom(display, "WM_TAKE_FOCUS", True),
+                          XInternAtom(display, "_NET_WM_PING", True) };
+//                          XInternAtom(display, "_NET_WM_SYNC_REQUEST", True) };
+
+    XSetWMProtocols(display, xwindow, protocols, 3);
     g_print("X WINDOW ID = %ld\n", xwindow);
+
+    //TODO: set _NET_WM_PID
 
     Atom type_atom;
     switch (type) {
         case UTILITY:
-            type_atom = XInternAtom(display, "_NET_WM_WINDOW_TYPE_UTILITY", true);
+            type_atom = XInternAtom(display, "_NET_WM_WINDOW_TYPE_UTILITY", True);
             break;
         case POPUP:
-            type_atom = XInternAtom(display, " _NET_WM_WINDOW_TYPE_POPUP_MENU", true);
+            type_atom = XInternAtom(display, " _NET_WM_WINDOW_TYPE_POPUP_MENU", True);
             break;
         case NORMAL:
         default:
-            XChangeProperty(display, xwindow, XInternAtom(display, "WM_CLIENT_LEADER", true),
+            XChangeProperty(display, xwindow, XInternAtom(display, "WM_CLIENT_LEADER", True),
                             XA_WINDOW, 32, PropModeReplace, (unsigned char *) &xwindow, 1);
-            type_atom = XInternAtom(display, "_NET_WM_WINDOW_TYPE_NORMAL", true);
+            type_atom = XInternAtom(display, "_NET_WM_WINDOW_TYPE_NORMAL", True);
             break;
     }
 
-    XChangeProperty(display, xwindow, XInternAtom(display, "_NET_WM_WINDOW_TYPE", true),
+    XChangeProperty(display, xwindow, XInternAtom(display, "_NET_WM_WINDOW_TYPE", True),
                    XA_ATOM, 32, PropModeReplace, (unsigned char *) &type_atom, 1);
+
+
+    //for _NET_WM_PING
+    long pid = getpid();
+    XChangeProperty(display, xwindow,
+                   XInternAtom(display, "_NET_WM_PID", True),
+                   XA_CARDINAL, 32, PropModeReplace, (guchar *) & pid, 1);
 
     if (gchar* app_name = get_application_name()) {
         XClassHint *class_hints = XAllocClassHint();
@@ -953,6 +968,26 @@ static void geometry_set_window_y(WindowGeometry *windowGeometry, int value) {
     windowGeometry->refy = newValue;
 }
 
+void WindowContextTop::process_client_message(XClientMessageEvent* event) {
+    g_print("process_client_message: %s\n", XGetAtomName(display, event->message_type));
+
+    if (XInternAtom(display, "WM_PROTOCOLS", True) == event->message_type) {
+        Atom atom = (Atom) event->data.l[0];
+        g_print("WM_PROTOCOLS: %s\n", XGetAtomName(display, atom));
+
+            if (XInternAtom(display, "_NET_WM_PING", True) == atom) {
+            event->window = DefaultRootWindow(display);
+            XSendEvent(display, event->window, False,
+                      SubstructureRedirectMask | SubstructureNotifyMask, (XEvent *) event);
+            XFlush(display);
+        } else if (XInternAtom(display, "WM_TAKE_FOCUS", True) == atom) {
+            XSetInputFocus(display, xwindow, RevertToParent, event->data.l[1]);
+        } else if (XInternAtom(display, "WM_DELETE_WINDOW", True) == atom) {
+            process_destroy();
+        }
+    }
+}
+
 void WindowContextTop::process_property(XPropertyEvent* event) {
     g_print("process_property: %s\n", XGetAtomName(display, event->atom));
 
@@ -1027,12 +1062,17 @@ void WindowContextTop::update_window_constraints() {
     g_print("update_window_constraints\n");
     XSizeHints* hints = XAllocSizeHints();
 
-    if (resizable.value) {
-        hints->min_width = (resizable.minw == -1) ? 1
-                           : resizable.minw - geometry.extents.left - geometry.extents.right;
+    hints->win_gravity = NorthWestGravity;
+    hints->flags = (PMinSize | PMaxSize | PWinGravity);
 
-        hints->min_height = (resizable.minh == -1) ? 1
-                            : resizable.minh - geometry.extents.top - geometry.extents.bottom;
+    if (resizable.value) {
+        int min_w = (resizable.minw == -1) ? 1
+                      : resizable.minw - geometry.extents.left - geometry.extents.right;
+        int min_h =  (resizable.minh == -1) ? 1
+                      : resizable.minh - geometry.extents.top - geometry.extents.bottom;
+
+        hints->min_width = (min_w < 1) ? 1 : min_w;
+        hints->min_height = (min_h < 1) ? 1 : min_h;
 
         hints->max_width = (resizable.maxw == -1) ? G_MAXINT
                             : resizable.maxw - geometry.extents.left - geometry.extents.right;
@@ -1040,18 +1080,19 @@ void WindowContextTop::update_window_constraints() {
         hints->max_height = (resizable.maxh == -1) ? G_MAXINT
                            : resizable.maxh - geometry.extents.top - geometry.extents.bottom;
 
+        g_print("min/max size (resizable) %d,%d/%d,%d\n", hints->min_width, hints->min_height,
+            hints->max_width, hints->max_height);
+
     } else {
         int w = geometry_get_content_width(&geometry);
         int h = geometry_get_content_height(&geometry);
 
+        g_print("min/max size (not resizable) %d,%d\n", w, h);
         hints->min_width = w;
         hints->min_height = h;
         hints->max_width = w;
         hints->max_height = h;
     }
-
-    hints->win_gravity = NorthWestGravity;
-    hints->flags = (PMinSize | PMaxSize | PWinGravity);
 
     if (!map_received) {
         hints->x = geometry_get_window_x(&geometry);
@@ -1073,7 +1114,6 @@ void WindowContextTop::set_visible(bool visible) {
 
     //JDK-8220272 - fire event first because GDK_FOCUS_CHANGE is not always in order
 //    if (visible && jwindow && isEnabled()) {
-//        g_print("jWindowNotifyFocus -> com_sun_glass_events_WindowEvent_FOCUS_GAINED\n");
 //        mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus, com_sun_glass_events_WindowEvent_FOCUS_GAINED);
 //        CHECK_JNI_EXCEPTION(mainEnv);
 //    }
@@ -1081,7 +1121,6 @@ void WindowContextTop::set_visible(bool visible) {
 
 void WindowContextTop::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h, int cw, int ch) {
     g_print("set_bounds: %d, %d, %d, %d, %d, %d\n", x, y, w, h, cw, ch);
-    update_frame_extents();
 
     requested_bounds.width = w;
     requested_bounds.height = h;
@@ -1260,8 +1299,8 @@ void WindowContextTop::set_enabled(bool enabled) {
 }
 
 void WindowContextTop::set_minimum_size(int w, int h) {
-    resizable.minw = w;
-    resizable.minh = h;
+    resizable.minw = (w <= 0) ? 1 : w;
+    resizable.minh = (h <= 0) ? 1 : h;
     update_window_constraints();
 }
 

@@ -158,6 +158,7 @@ public:
     virtual void set_background(float, float, float) = 0;
 
     virtual void process_property(XPropertyEvent*) = 0;
+    virtual void process_client_message(XClientMessageEvent*) = 0;
     virtual void process_configure(XConfigureEvent*) = 0;
     virtual void process_map() = 0;
     virtual void process_focus(XFocusChangeEvent*) = 0;
@@ -325,6 +326,7 @@ public:
     WindowContextTop(jobject, WindowContext*, long, WindowFrameType, WindowType, int);
     void process_map();
     void process_property(XPropertyEvent*);
+    void process_client_message(XClientMessageEvent*);
     void process_configure(XConfigureEvent*);
     void process_destroy();
     void change_wm_state(bool add, Atom state1, Atom state2);
