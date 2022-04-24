@@ -25,10 +25,13 @@
 #ifndef GLASS_WINDOW_H
 #define        GLASS_WINDOW_H
 
+//TODO: remove
 #include <gtk/gtk.h>
 #include <X11/Xlib.h>
+#include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/Xdamage.h>
+#include <X11/extensions/shape.h>
 
 #include <jni.h>
 #include <set>
@@ -59,14 +62,6 @@ enum WindowType {
     UTILITY,
     POPUP
 };
-
-/*
-enum request_type {
-    REQUEST_NONE,
-    REQUEST_RESIZABLE,
-    REQUEST_NOT_RESIZABLE
-};
-*/
 
 typedef struct {
     unsigned long flags;
@@ -162,9 +157,7 @@ public:
     virtual void set_level(int) = 0;
     virtual void set_background(float, float, float) = 0;
 
-    virtual void process_property_notify(GdkEventProperty*) = 0;
     virtual void process_property(XPropertyEvent*) = 0;
-    virtual void process_configure(GdkEventConfigure*) = 0;
     virtual void process_configure(XConfigureEvent*) = 0;
     virtual void process_map() = 0;
     virtual void process_focus(XFocusChangeEvent*) = 0;
@@ -180,6 +173,8 @@ public:
     virtual void process_visibility(XVisibilityEvent*) = 0;
 
     virtual void notify_state(jint) = 0;
+    virtual void notify_window_resize() = 0;
+    virtual void notify_window_move() = 0;
     virtual void notify_on_top(bool) {}
 
     virtual void add_child(WindowContextTop* child) = 0;
@@ -329,9 +324,7 @@ class WindowContextTop: public WindowContextBase {
 public:
     WindowContextTop(jobject, WindowContext*, long, WindowFrameType, WindowType, int);
     void process_map();
-    void process_property_notify(GdkEventProperty*);
     void process_property(XPropertyEvent*);
-    void process_configure(GdkEventConfigure*);
     void process_configure(XConfigureEvent*);
     void process_destroy();
     void change_wm_state(bool add, Atom state1, Atom state2);
@@ -356,6 +349,8 @@ public:
     void set_level(int);
     void set_visible(bool);
     void notify_on_top(bool);
+    void notify_window_resize();
+    void notify_window_move();
 
     void enter_fullscreen();
     void exit_fullscreen();
@@ -370,6 +365,7 @@ private:
     bool get_frame_extents_property(int *, int *, int *, int *);
     void activate_window();
     void update_frame_extents();
+    void request_frame_extents();
     void window_configure(XWindowChanges *, unsigned int);
     void update_window_constraints();
     void update_ontop_tree(bool);

@@ -373,7 +373,7 @@ static Bool isXkbAvailable(Display *display) {
 JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1isKeyLocked
   (JNIEnv * env, jobject obj, jint keyCode)
 {
-    Display* display = gdk_x11_display_get_xdisplay(gdk_display_get_default());
+    Display* display = X_CURRENT_DISPLAY;
     if (!isXkbAvailable(display)) {
         return com_sun_glass_events_KeyEvent_KEY_LOCK_UNKNOWN;
     }

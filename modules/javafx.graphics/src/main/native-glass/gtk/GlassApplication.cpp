@@ -133,12 +133,12 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
     while (XPending(display)) {
         XNextEvent(display, &xevent);
 
-//        if (xevent.xany.window == DefaultRootWindow(display)) {
-//            g_print("============> Root Window Event %d\n", xevent.type);
-//        }
+        if (xevent.xany.window == DefaultRootWindow(display)) {
+            g_print("============> Root Window Event %d\n", xevent.type);
+        }
 
         if (XFindContext(display, xevent.xany.window, X_CONTEXT, (XPointer *) &ctx) != 0) {
-//            g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
+            g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
             continue;
         }
 
@@ -153,28 +153,28 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
 //                    g_print("============> X11 Configure Request\n");
 //                    break;
                 case VisibilityNotify:
-//                    g_print("X11 Visibility\n");
+                    g_print("X11 Visibility\n");
                     ctx->process_visibility(&xevent.xvisibility);
                     break;
                 case ConfigureNotify:
-//                    g_print("X11 Configure\n");
+                    g_print("X11 Configure\n");
                     ctx->process_configure(&xevent.xconfigure);
                     break;
                 case PropertyNotify:
-//                    g_print("X11 Property Notify\n");
+                    g_print("X11 Property Notify\n");
                     ctx->process_property(&xevent.xproperty);
                     break;
                 case MapNotify:
-//                    g_print("X11 MAP\n");
+                    g_print("X11 MAP\n");
                     ctx->process_map();
                     break;
                 case FocusIn:
                 case FocusOut:
-//                    g_print("X11 Focus\n");
+                    g_print("X11 Focus\n");
                     ctx->process_focus(&xevent.xfocus);
                     break;
                 case Expose:
-//                    g_print("X11 Expose\n");
+                    g_print("X11 Expose\n");
                     ctx->process_expose(&xevent.xexpose);
                     break;
                 case XDamageNotify:

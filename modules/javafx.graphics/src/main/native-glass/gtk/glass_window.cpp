@@ -35,25 +35,8 @@
 
 #include <com_sun_glass_ui_Window_Level.h>
 
-
-#include <X11/extensions/shape.h>
-#include <X11/Xatom.h>
-#include <X11/extensions/Xdamage.h>
-
-#include <cairo.h>
-#include <cairo-xlib.h>
-#include <gdk/gdkx.h>
-#include <gdk/gdk.h>
-#ifdef GLASS_GTK3
-#include <gtk/gtkx.h>
-#endif
-
 #include <string.h>
-
 #include <algorithm>
-
-#define MOUSE_BACK_BTN 8
-#define MOUSE_FORWARD_BTN 9
 
 WindowContext * WindowContextBase::sm_grab_window = NULL;
 WindowContext * WindowContextBase::sm_mouse_drag_window = NULL;
@@ -270,9 +253,9 @@ static inline jint xlib_button_number_to_mouse_button(guint button) {
             return com_sun_glass_events_MouseEvent_BUTTON_OTHER;
         case 3:
             return com_sun_glass_events_MouseEvent_BUTTON_RIGHT;
-        case MOUSE_BACK_BTN:
+        case 4:
             return com_sun_glass_events_MouseEvent_BUTTON_BACK;
-        case MOUSE_FORWARD_BTN:
+        case 5:
             return com_sun_glass_events_MouseEvent_BUTTON_FORWARD;
         default:
             // Other buttons are not supported by quantum and are not reported by other platforms
@@ -383,7 +366,7 @@ void WindowContextBase::process_mouse_motion(XMotionEvent* event) {
         button = com_sun_glass_events_MouseEvent_BUTTON_FORWARD;
     }
 
-    g_print("Mouse motion %d, %d, %d, %d\n", event->x_root, event->y_root, event->x, event->y);
+//    g_print("Mouse motion %d, %d, %d, %d\n", event->x_root, event->y_root, event->x, event->y);
     if (jview) {
         mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
                 isDrag ? com_sun_glass_events_MouseEvent_DRAG : com_sun_glass_events_MouseEvent_MOVE,
@@ -551,15 +534,6 @@ void WindowContextBase::set_visible(bool visible) {
 }
 
 bool WindowContextBase::is_visible() {
-//    XWindowAttributes xattr;
-//    if (XGetWindowAttributes(display, xwindow, &xattr)) {
-//        return !(xattr.map_state == IsUnmapped);
-//    }
-
-//    if (!map_received) {
-//        return false;
-//    }
-
     //VisibilityUnobscured, VisibilityPartiallyObscured, VisibilityFullyObscured
     return (visibility_state == VisibilityUnobscured
                 || visibility_state == VisibilityPartiallyObscured);
@@ -668,8 +642,7 @@ WindowContextBase::~WindowContextBase() {
         XCloseIM(xim.im);
         xim.im = NULL;
     }
-//TODO
-//    gtk_widget_destroy(gtk_widget);
+    XDestroyWindow(display, xwindow);
 }
 
 ////////////////////////////// WindowContextTop /////////////////////////////////
@@ -800,6 +773,9 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                     PropModeReplace, (unsigned char *)&hints, sizeof (MwmHints)/sizeof (long));
 
     XFlush(display);
+
+    request_frame_extents();
+
 //    gdk_window_register_dnd(gdk_window);
 }
 
@@ -836,13 +812,31 @@ void WindowContextTop::activate_window() {
 //    }
 }
 
-void WindowContextTop::update_frame_extents() {
-    g_print("update_frame_extents\n");
+void WindowContextTop::request_frame_extents() {
     if (frame_type != TITLED) {
         return;
     }
 
-    //TODO: check if WM Supports it
+    g_print("_NET_REQUEST_FRAME_EXTENTS\n");
+
+    Atom reqAtom = XInternAtom(display, "_NET_REQUEST_FRAME_EXTENTS", True);
+
+    XClientMessageEvent clientMessage;
+    memset(&clientMessage, 0, sizeof(clientMessage));
+
+    clientMessage.type = ClientMessage;
+    clientMessage.window = xwindow;
+    clientMessage.message_type = reqAtom;
+    clientMessage.format = 32;
+
+    XSendEvent(display, DefaultRootWindow(display), False,
+               SubstructureRedirectMask | SubstructureNotifyMask,
+               (XEvent *) &clientMessage);
+
+    XFlush(display);
+}
+
+void WindowContextTop::update_frame_extents() {
     Atom frame_extents_atom = XInternAtom(display, "_NET_FRAME_EXTENTS", True);
     bool changed = false;
     long top, left, bottom, right;
@@ -873,7 +867,9 @@ void WindowContextTop::update_frame_extents() {
                 geometry.extents.left = left;
                 geometry.extents.bottom = bottom;
                 geometry.extents.right = right;
+
                 update_window_constraints();
+                notify_window_resize();
             }
         }
     }
@@ -951,24 +947,19 @@ static void geometry_set_window_y(WindowGeometry *windowGeometry, int value) {
 }
 
 void WindowContextTop::process_property(XPropertyEvent* event) {
+    g_print("process_property: %s\n", XGetAtomName(display, event->atom));
+
+    //TODO: global?
     Atom frame_extents_atom = XInternAtom(display, "_NET_FRAME_EXTENTS", True);
+    Atom wm_state_atom = XInternAtom(display, "_NET_WM_STATE", True);
+
     if (event->state == PropertyNewValue && event->window == xwindow) {
         if (event->atom == frame_extents_atom) {
-            g_print("Got frame extents\n");
             update_frame_extents();
+        } else if (event->atom == wm_state_atom) {
+            //TODO
         }
     }
-}
-
-void WindowContextTop::process_property_notify(GdkEventProperty* event) {
-//    static GdkAtom atom_net_wm_state = gdk_atom_intern_static_string("_NET_WM_STATE");
-//
-    //    if (event->atom == atom_net_wm_state && event->window == gdk_window) {
-//        process_net_wm_property();
-//    }
-}
-
-void WindowContextTop::process_configure(GdkEventConfigure* event) {
 }
 
 void WindowContextTop::process_configure(XConfigureEvent* event) {
@@ -998,41 +989,17 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
     }
     g_print("process_configure: %d, %d, %d, %d\n", x, y, w, h);
 
-    // JDK-8232811: to avoid conflicting events, update the geometry only after window pops.
-    if (map_received) {
-        geometry.final_width.value = w;
-        geometry.final_width.type = BOUNDSTYPE_CONTENT;
-        geometry.final_height.value = h;
-        geometry.final_height.type = BOUNDSTYPE_CONTENT;
-    }
+    geometry.final_width.value = w;
+    geometry.final_width.type = BOUNDSTYPE_CONTENT;
+    geometry.final_height.value = h;
+    geometry.final_height.type = BOUNDSTYPE_CONTENT;
 
     geometry_set_window_x(&geometry, x);
     geometry_set_window_y(&geometry, y);
 
-    if (jview) {
-//        g_print("jViewNotifyResize\n");
-        mainEnv->CallVoidMethod(jview, jViewNotifyResize,
-                event->width,
-                event->height);
-        CHECK_JNI_EXCEPTION(mainEnv)
-        mainEnv->CallVoidMethod(jview, jViewNotifyView,
-                com_sun_glass_events_ViewEvent_MOVE);
-        CHECK_JNI_EXCEPTION(mainEnv)
-    }
-
     if (jwindow) {
-//        g_print("jWindowNotifyResize -> %d,%d\n", geometry.current_width, geometry.current_height);
-
-        mainEnv->CallVoidMethod(jwindow, jWindowNotifyResize,
-                (is_maximized)
-                    ? com_sun_glass_events_WindowEvent_MAXIMIZE
-                    : com_sun_glass_events_WindowEvent_RESIZE,
-                geometry.current_width,
-                geometry.current_height);
-        CHECK_JNI_EXCEPTION(mainEnv)
-
-        mainEnv->CallVoidMethod(jwindow, jWindowNotifyMove, x, y);
-        CHECK_JNI_EXCEPTION(mainEnv)
+        notify_window_resize();
+        notify_window_move();
     }
 
     glong to_screen = getScreenPtrForLocation(x, y);
@@ -1070,15 +1037,6 @@ void WindowContextTop::update_window_constraints() {
         int w = geometry_get_content_width(&geometry);
         int h = geometry_get_content_height(&geometry);
 
-//        //FIXME: when it's -1 ?
-//        if (w == -1 && h == -1) {
-//            XWindowAttributes xattr;
-//            if (XGetWindowAttributes(display, xwindow, &xattr)) {
-//                w = xattr.width;
-//                h = xattr.height;
-//            }
-//        }
-
         hints->min_width = w;
         hints->min_height = h;
         hints->max_width = w;
@@ -1087,7 +1045,6 @@ void WindowContextTop::update_window_constraints() {
 
     hints->flags = (PMinSize | PMaxSize);
 
-//    g_print("XSetNormalHints: constraints\n");
     XSetWMNormalHints(display, xwindow, hints);
     XFree(hints);
 }
@@ -1181,18 +1138,29 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
     if (windowChangesMask & (CWX | CWY)) {
         //FIXME: for some reason this is not consistent
         if (!map_received) {
-            g_print("size hints\n");
             XSizeHints* hints = XAllocSizeHints();
             hints->x = windowChanges->x;
             hints->y = windowChanges->y;
             hints->flags = PPosition;
             XSetWMNormalHints(display, xwindow, hints);
+            g_print("XSetWMNormalHints PPosition: %d, %d\n", hints->x, hints->y);
             XFree(hints);
+
+
+            notify_window_move();
+        }
+
+        g_print("(windowChangesMask & (CWX | CWY): %d, %d\n", windowChanges->x, windowChanges->y);
+    }
+
+    if (windowChangesMask & (CWWidth | CWHeight)) {
+        if (!map_received) {
+            notify_window_resize();
         }
     }
 
     XReconfigureWMWindow(display, xwindow, 0, windowChangesMask, windowChanges);
-//    XFlush(display);
+    XFlush(display);
 }
 
 void WindowContextTop::applyShapeMask(void* data, uint width, uint height)
@@ -1364,6 +1332,49 @@ void WindowContextTop::notify_on_top(bool top) {
                     top ? com_sun_glass_ui_Window_Level_FLOATING :  com_sun_glass_ui_Window_Level_NORMAL);
             CHECK_JNI_EXCEPTION(mainEnv);
         }
+    }
+}
+
+void WindowContextTop::notify_window_resize() {
+    int w = geometry_get_window_width(&geometry);
+    int h = geometry_get_window_height(&geometry);
+
+    g_print("jWindowNotifyResize -> %d,%d\n", w, h);
+
+    mainEnv->CallVoidMethod(jwindow, jWindowNotifyResize,
+            (is_maximized)
+                ? com_sun_glass_events_WindowEvent_MAXIMIZE
+                : com_sun_glass_events_WindowEvent_RESIZE,
+            w, h);
+    CHECK_JNI_EXCEPTION(mainEnv)
+
+    if (jview) {
+        int cw = geometry_get_content_width(&geometry);
+        int ch = geometry_get_content_height(&geometry);
+
+        g_print("jViewNotifyResize %d, %d\n", cw, ch);
+        mainEnv->CallVoidMethod(jview, jViewNotifyResize, cw, ch);
+        CHECK_JNI_EXCEPTION(mainEnv)
+
+//        mainEnv->CallVoidMethod(jview, jViewNotifyView,
+//                com_sun_glass_events_ViewEvent_MOVE);
+//        CHECK_JNI_EXCEPTION(mainEnv)
+    }
+}
+
+void WindowContextTop::notify_window_move() {
+    int x = geometry_get_window_x(&geometry);
+    int y = geometry_get_window_y(&geometry);
+
+    g_print("jWindowNotifyMove %d, %d\n", x, y);
+
+    mainEnv->CallVoidMethod(jwindow, jWindowNotifyMove, x, y);
+    CHECK_JNI_EXCEPTION(mainEnv)
+
+    if (jview) {
+        mainEnv->CallVoidMethod(jview, jViewNotifyView,
+                com_sun_glass_events_ViewEvent_MOVE);
+        CHECK_JNI_EXCEPTION(mainEnv)
     }
 }
 
