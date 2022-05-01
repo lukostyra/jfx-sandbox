@@ -26,6 +26,7 @@
 //#include <X11/Xlib.h>
 //#include <X11/Xatom.h>
 #include <X11/extensions/Xdamage.h>
+#include <X11/extensions/Xrandr.h>
 #include <X11/Xresource.h>
 #include <gdk/gdk.h>
 #include <gdk/gdkx.h>
@@ -84,6 +85,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
 typedef struct x11_source {
     GSource source;
     Display *display;
+    int rr_event_base;
 } X11Source;
 
 static GSourceFuncs x11_event_funcs = {
@@ -100,6 +102,13 @@ static void x11_monitor_events(Display* display) {
 
     source = g_source_new (&x11_event_funcs, sizeof(X11Source));
     ((X11Source*)source)->display = display;
+
+    int rr_event_base, rr_error_base;
+    Bool have_rr = XRRQueryExtension(display, &rr_event_base, &rr_error_base);
+    if (have_rr) {
+        ((X11Source*)source)->rr_event_base = rr_event_base;
+        XRRSelectInput(display, DefaultRootWindow(display), RRScreenChangeNotifyMask);
+    }
 
     GPollFD dpy_pollfd = {
         XConnectionNumber(display),
@@ -128,10 +137,23 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
     XEvent xevent;
 
     Display *display = ((X11Source*) source)->display;
+    int rr_event_base = ((X11Source*) source)->rr_event_base;
     WindowContext* ctx;
 
     while (XPending(display)) {
         XNextEvent(display, &xevent);
+
+        if (xevent.xany.window == DefaultRootWindow(display)) {
+            g_print("============> Root Window Event %d\n", xevent.type);
+
+            if (rr_event_base + RRScreenChangeNotify == xevent.type) {
+                g_print("============> UPDATE SCREENS %d\n", xevent.type);
+                mainEnv->CallStaticVoidMethod(jScreenCls, jScreenNotifySettingsChanged);
+                LOG_EXCEPTION(mainEnv);
+            }
+
+            continue;
+        }
 
         if (XFindContext(display, xevent.xany.window, X_CONTEXT, (XPointer *) &ctx) != 0) {
             g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
