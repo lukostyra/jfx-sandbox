@@ -1044,18 +1044,18 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
         notify_window_move();
     }
 
-    glong to_screen = getScreenPtrForLocation(x, y);
-    if (to_screen != -1) {
-        if (to_screen != screen) {
-            if (jwindow) {
-                //notify screen changed
-                jobject jScreen = createJavaScreen(mainEnv, to_screen);
-                mainEnv->CallVoidMethod(jwindow, jWindowNotifyMoveToAnotherScreen, jScreen);
-                CHECK_JNI_EXCEPTION(mainEnv)
-            }
-            screen = to_screen;
-        }
-    }
+//    glong to_screen = getScreenPtrForLocation(x, y);
+//    if (to_screen != -1) {
+//        if (to_screen != screen) {
+//            if (jwindow) {
+//                //notify screen changed
+//                jobject jScreen = createJavaScreen(mainEnv, to_screen);
+//                mainEnv->CallVoidMethod(jwindow, jWindowNotifyMoveToAnotherScreen, jScreen);
+//                CHECK_JNI_EXCEPTION(mainEnv)
+//            }
+//            screen = to_screen;
+//        }
+//    }
 }
 
 void WindowContextTop::update_window_constraints() {

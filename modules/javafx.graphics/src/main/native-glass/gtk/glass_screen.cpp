@@ -28,15 +28,13 @@
 #include "glass_general.h"
 
 #include <X11/Xatom.h>
-#include <gdk/gdk.h>
-#include <gdk/gdkx.h>
+
 
 jfloat OverrideUIScale = -1.0f;
 int DEFAULT_DPI = 96;
 
-static guint get_current_desktop(GdkScreen *screen) {
-    Display* display = gdk_x11_display_get_xdisplay(gdk_display_get_default());
-    Atom currentDesktopAtom = XInternAtom(display, "_NET_CURRENT_DESKTOP", True);
+static guint get_current_desktop(Screen *screen) {
+    Atom currentDesktopAtom = XInternAtom(X_CURRENT_DISPLAY, "_NET_CURRENT_DESKTOP", True);
     guint ret = 0;
 
     Atom type;
@@ -48,8 +46,8 @@ static guint get_current_desktop(GdkScreen *screen) {
         return 0;
     }
 
-    int result = XGetWindowProperty(display,
-                                    GDK_WINDOW_XID(gdk_screen_get_root_window(screen)),
+    int result = XGetWindowProperty(X_CURRENT_DISPLAY,
+                                    RootWindowOfScreen(screen),
                                     currentDesktopAtom, 0, G_MAXLONG, False, XA_CARDINAL,
                                     &type, &format, &num, &left, (unsigned char **)&data);
 
@@ -65,11 +63,11 @@ static guint get_current_desktop(GdkScreen *screen) {
 
 }
 
-static GdkRectangle get_screen_workarea(GdkScreen *screen) {
-    Display* display = gdk_x11_display_get_xdisplay(gdk_display_get_default());
-    GdkRectangle ret = { 0, 0, gdk_screen_get_width(screen), gdk_screen_get_height(screen)};
+static XRectangle get_screen_workarea(Screen *screen) {
+    XRectangle ret = { 0, 0, WidthOfScreen(screen), HeightOfScreen(screen) };
 
-    Atom workareaAtom = XInternAtom(display, "_NET_WORKAREA", True);
+    //TODO: Window manager might not support _NET_WORKAREA
+    Atom workareaAtom = XInternAtom(X_CURRENT_DISPLAY, "_NET_WORKAREA", True);
 
     Atom type;
     int format;
@@ -80,8 +78,8 @@ static GdkRectangle get_screen_workarea(GdkScreen *screen) {
         return ret;
     }
 
-    int result = XGetWindowProperty(display,
-                                    GDK_WINDOW_XID(gdk_screen_get_root_window(screen)),
+    int result = XGetWindowProperty(X_CURRENT_DISPLAY,
+                                    RootWindowOfScreen(screen),
                                     workareaAtom, 0, G_MAXLONG, False, AnyPropertyType,
                                     &type, &format, &num, &left, (unsigned char **)&data);
 
@@ -100,69 +98,65 @@ static GdkRectangle get_screen_workarea(GdkScreen *screen) {
     }
 
     return ret;
-
 }
 
-jfloat getUIScale(GdkScreen* screen) {
-    jfloat uiScale;
-    if (OverrideUIScale > 0.0f) {
-        uiScale = OverrideUIScale;
-    } else {
-        char *scale_str = getenv("GDK_SCALE");
-        int gdk_scale = (scale_str == NULL) ? -1 : atoi(scale_str);
-        if (gdk_scale > 0) {
-            uiScale = (jfloat) gdk_scale;
-        } else {
-            uiScale = (jfloat) glass_settings_get_guint_opt("org.gnome.desktop.interface",
-                                                            "scaling-factor", 0);
-            if (uiScale < 1) {
-                uiScale = (jfloat) (gdk_screen_get_resolution(screen) / DEFAULT_DPI);
-            }
-            if (uiScale < 1) {
-                uiScale = 1;
-            }
-        }
-    }
-    return uiScale;
+jfloat getUIScale(Screen* screen) {
+    return 1.0f;
+//    jfloat uiScale;
+//    if (OverrideUIScale > 0.0f) {
+//        uiScale = OverrideUIScale;
+//    } else {
+//        char *scale_str = getenv("GDK_SCALE");
+//        int gdk_scale = (scale_str == NULL) ? -1 : atoi(scale_str);
+//        if (gdk_scale > 0) {
+//            uiScale = (jfloat) gdk_scale;
+//        } else {
+//            uiScale = (jfloat) glass_settings_get_guint_opt("org.gnome.desktop.interface",
+//                                                            "scaling-factor", 0);
+//            if (uiScale < 1) {
+//                uiScale = (jfloat) (gdk_screen_get_resolution(screen) / DEFAULT_DPI);
+//            }
+//            if (uiScale < 1) {
+//                uiScale = 1;
+//            }
+//        }
+//    }
+//    return uiScale;
 }
 
-static jobject createJavaScreen(JNIEnv* env, GdkScreen* screen, gint monitor_idx)
-{
-    GdkRectangle workArea = get_screen_workarea(screen);
+static jobject createJavaScreen(JNIEnv* env, Screen* screen) {
+
+    XRectangle workArea = get_screen_workarea(screen);
     LOG4("Work Area: x:%d, y:%d, w:%d, h:%d\n", workArea.x, workArea.y, workArea.width, workArea.height);
+    g_print("Work Area: x:%d, y:%d, w:%d, h:%d\n", workArea.x, workArea.y, workArea.width, workArea.height);
 
-    GdkRectangle monitor_geometry;
-    gdk_screen_get_monitor_geometry(screen, monitor_idx, &monitor_geometry);
-    LOG1("convert monitor[%d] -> glass Screen\n", monitor_idx)
+    XWindowAttributes rootwin_geometry;
+    XGetWindowAttributes(X_CURRENT_DISPLAY, RootWindowOfScreen(screen), &rootwin_geometry);
+
+//    LOG1("convert monitor[%d] -> glass Screen\n", monitor_idx)
     LOG4("[x: %d y: %d w: %d h: %d]\n",
-         monitor_geometry.x, monitor_geometry.y,
-         monitor_geometry.width, monitor_geometry.height)
+         rootwin_geometry.x, rootwin_geometry.y,
+         rootwin_geometry.width, rootwin_geometry.height)
 
-    GdkVisual* visual = gdk_screen_get_system_visual(screen);
-
-    GdkRectangle working_monitor_geometry;
-    gdk_rectangle_intersect(&workArea, &monitor_geometry, &working_monitor_geometry);
+    g_print("[x: %d y: %d w: %d h: %d]\n",
+         rootwin_geometry.x, rootwin_geometry.y,
+         rootwin_geometry.width, rootwin_geometry.height);
 
     jfloat uiScale = getUIScale(screen);
 
+    jint mx = rootwin_geometry.x / uiScale;
+    jint my = rootwin_geometry.y / uiScale;
+    jint mw = rootwin_geometry.width / uiScale;
+    jint mh = rootwin_geometry.height / uiScale;
 
-    jint mx = monitor_geometry.x / uiScale;
-    jint my = monitor_geometry.y / uiScale;
-    jint mw = monitor_geometry.width / uiScale;
-    jint mh = monitor_geometry.height / uiScale;
-    jint wx = working_monitor_geometry.x / uiScale;
-    jint wy = working_monitor_geometry.y / uiScale;
-    jint ww = working_monitor_geometry.width / uiScale;
-    jint wh = working_monitor_geometry.height / uiScale;
+    jint wx = workArea.x / uiScale;
+    jint wy = workArea.y / uiScale;
+    jint ww = workArea.width / uiScale;
+    jint wh = workArea.height / uiScale;
 
-    gint mmW = gdk_screen_get_monitor_width_mm(screen, monitor_idx);
-    gint mmH = gdk_screen_get_monitor_height_mm(screen, monitor_idx);
-    if (mmW <= 0 || mmH <= 0) {
-        if (gdk_screen_get_n_monitors(screen) == 1) {
-            mmW = gdk_screen_get_width_mm(screen);
-            mmH = gdk_screen_get_height_mm(screen);
-        }
-    }
+    int mmW = WidthMMOfScreen(screen);
+    int mmH = HeightMMOfScreen(screen);
+
     jint dpiX, dpiY;
     if (mmW <= 0 || mmH <= 0) {
         dpiX = dpiY = 96;
@@ -172,16 +166,16 @@ static jobject createJavaScreen(JNIEnv* env, GdkScreen* screen, gint monitor_idx
     }
 
     jobject jScreen = env->NewObject(jScreenCls, jScreenInit,
-                                     (jlong)monitor_idx,
+                                     (jlong)XScreenNumberOfScreen(screen),
 
-                                     (visual ? glass_gdk_visual_get_depth(visual) : 0),
+                                     DefaultDepthOfScreen(screen),
 
                                      mx, my, mw, mh,
 
-                                     monitor_geometry.x,
-                                     monitor_geometry.y,
-                                     monitor_geometry.width,
-                                     monitor_geometry.height,
+                                     rootwin_geometry.x,
+                                     rootwin_geometry.y,
+                                     rootwin_geometry.width,
+                                     rootwin_geometry.height,
 
                                      wx, wy, ww, wh,
 
@@ -192,42 +186,43 @@ static jobject createJavaScreen(JNIEnv* env, GdkScreen* screen, gint monitor_idx
     return jScreen;
 }
 
-jobject createJavaScreen(JNIEnv* env, gint monitor_idx) {
-    GdkScreen *default_gdk_screen = gdk_screen_get_default();
+jobject createJavaScreen(JNIEnv* env, int monitor_idx) {
+    Screen* default_screen = ScreenOfDisplay(X_CURRENT_DISPLAY, monitor_idx);
+
     try {
-        return createJavaScreen(env, default_gdk_screen, monitor_idx);
+        return createJavaScreen(env, default_screen);
     } catch (jni_exception&) {
         return NULL;
     }
 }
 
 jobjectArray rebuild_screens(JNIEnv* env) {
-    GdkScreen *default_gdk_screen = gdk_screen_get_default();
-    gint n_monitors = gdk_screen_get_n_monitors(default_gdk_screen);
+    int n_monitors = ScreenCount(X_CURRENT_DISPLAY);
 
     jobjectArray jscreens = env->NewObjectArray(n_monitors, jScreenCls, NULL);
     JNI_EXCEPTION_TO_CPP(env)
-    LOG1("Available monitors: %d\n", n_monitors)
+    LOG1("Available screens: %d\n", n_monitors)
 
     int i;
     for (i=0; i < n_monitors; i++) {
-        env->SetObjectArrayElement(jscreens, i, createJavaScreen(env, default_gdk_screen, i));
+        env->SetObjectArrayElement(jscreens, i, createJavaScreen(env, ScreenOfDisplay(X_CURRENT_DISPLAY, i)));
         JNI_EXCEPTION_TO_CPP(env)
     }
 
     return jscreens;
 }
 
+//
+//glong getScreenPtrForLocation(int x, int y) {
+//    //Note: we are relying on the fact that javafx_screen_id == gdk_monitor_id
+//    return gdk_screen_get_monitor_at_point(gdk_screen_get_default(), x, y);
+//}
 
-glong getScreenPtrForLocation(gint x, gint y) {
-    //Note: we are relying on the fact that javafx_screen_id == gdk_monitor_id
-    return gdk_screen_get_monitor_at_point(gdk_screen_get_default(), x, y);
-}
 
-void screen_settings_changed(GdkScreen* screen, gpointer user_data) {
-    (void)screen;
-    (void)user_data;
-
-    mainEnv->CallStaticVoidMethod(jScreenCls, jScreenNotifySettingsChanged);
-    LOG_EXCEPTION(mainEnv);
-}
+//void screen_settings_changed(GdkScreen* screen, gpointer user_data) {
+//    (void)screen;
+//    (void)user_data;
+//
+//    mainEnv->CallStaticVoidMethod(jScreenCls, jScreenNotifySettingsChanged);
+//    LOG_EXCEPTION(mainEnv);
+//}

@@ -28,8 +28,6 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <math.h>
-#include <gdk/gdk.h>
-#include <gdk/gdkx.h>
 
 #include <com_sun_glass_ui_GlassRobot.h>
 #include <com_sun_glass_ui_gtk_GtkRobot.h>
@@ -41,7 +39,6 @@
 #define MOUSE_BACK_BTN 8
 #define MOUSE_FORWARD_BTN 9
 
-
 static void getXPointerPos(int *x, int *y) {
     Display *xdisplay = X_CURRENT_DISPLAY;
 
@@ -49,7 +46,7 @@ static void getXPointerPos(int *x, int *y) {
     int win_x, win_y;
     guint mask = 0;
 
-    XQueryPointer(xdisplay, XRootWindow(xdisplay, DefaultScreen(xdisplay)),
+    XQueryPointer(xdisplay, RootWindowOfScreen(DefaultScreenOfDisplay(xdisplay)),
                   &child_win, &root_win, x, y, &win_x, &win_y, &mask);
 }
 
@@ -149,11 +146,11 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mouseMove
     Display *xdisplay = X_CURRENT_DISPLAY;
 
     checkXTest(env);
-    jfloat uiScale = getUIScale(gdk_screen_get_default());
+    jfloat uiScale = getUIScale(DefaultScreenOfDisplay(xdisplay));
     x = rint(x * uiScale);
     y = rint(y * uiScale);
     XWarpPointer(xdisplay, None,
-                XRootWindow(xdisplay, DefaultScreen(xdisplay)),
+                RootWindowOfScreen(DefaultScreenOfDisplay(xdisplay)),
                 0, 0, 0, 0, x, y);
 
     XSync(xdisplay, False);
@@ -246,7 +243,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1getMouseX
 
     jint x, y;
     getXPointerPos(&x, &y);
-    x = rint(x / getUIScale(gdk_screen_get_default()));
+    x = rint(x / getUIScale(DefaultScreenOfDisplay(X_CURRENT_DISPLAY)));
     return x;
 }
 
@@ -263,7 +260,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1getMouseY
 
     jint x, y;
     getXPointerPos(&x, &y);
-    y = rint(y / getUIScale(gdk_screen_get_default()));
+    y = rint(y / getUIScale(DefaultScreenOfDisplay(X_CURRENT_DISPLAY)));
     return y;
 }
 

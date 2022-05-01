@@ -27,14 +27,14 @@
 #define GLASS_SCREEN_H
 
 #include <jni.h>
+#include <X11/Xlib.h>
 
-#include <gtk/gtk.h>
 
 extern jfloat OverrideUIScale;
-jfloat getUIScale(GdkScreen* screen);
-jobject createJavaScreen(JNIEnv* env, gint monitor_idx);
-glong getScreenPtrForLocation(gint x, gint y);
+jfloat getUIScale(Screen* screen);
+jobject createJavaScreen(JNIEnv* env, int monitor_idx);
+//glong getScreenPtrForLocation(int x, int y);
 jobjectArray rebuild_screens(JNIEnv* env);
-void screen_settings_changed(GdkScreen* screen, gpointer user_data);
+//void screen_settings_changed(Screen* screen, gpointer user_data);
 
 #endif
