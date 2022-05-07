@@ -975,7 +975,7 @@ void WindowContextTop::process_client_message(XClientMessageEvent* event) {
         Atom atom = (Atom) event->data.l[0];
         g_print("WM_PROTOCOLS: %s\n", XGetAtomName(display, atom));
 
-            if (XInternAtom(display, "_NET_WM_PING", True) == atom) {
+        if (XInternAtom(display, "_NET_WM_PING", True) == atom) {
             event->window = DefaultRootWindow(display);
             XSendEvent(display, event->window, False,
                       SubstructureRedirectMask | SubstructureNotifyMask, (XEvent *) event);

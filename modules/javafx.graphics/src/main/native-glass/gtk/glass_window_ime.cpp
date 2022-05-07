@@ -40,7 +40,7 @@ static XKeyPressedEvent convert_event(GdkEventKey *event) {
 
     result.type = (event->type == GDK_KEY_PRESS) ? KeyPress : KeyRelease;
     result.send_event = event->send_event;
-    result.display = gdk_x11_display_get_xdisplay(gdk_window_get_display(event->window));
+    result.display = X_CURRENT_DISPLAY;
     result.window = result.subwindow = GDK_WINDOW_XID(event->window);
     result.root = GDK_WINDOW_XID(gdk_screen_get_root_window(glass_gdk_window_get_screen(event->window)));
     result.time = event->time;

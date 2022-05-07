@@ -23,8 +23,6 @@
  * questions.
  */
 
-//#include <X11/Xlib.h>
-//#include <X11/Xatom.h>
 #include <X11/extensions/Xdamage.h>
 #include <X11/extensions/Xrandr.h>
 #include <X11/Xresource.h>
@@ -47,12 +45,12 @@
 #include "glass_window.h"
 #include "glass_screen.h"
 
-GdkEventFunc process_events_prev;
 static void process_events(GdkEvent*, gpointer);
 
 JNIEnv* mainEnv; // Use only with main loop thread!!!
 
 extern gboolean disableGrab;
+static GMainLoop *mainLoop = NULL;
 
 static gboolean call_runnable (gpointer data)
 {
@@ -121,7 +119,7 @@ static void x11_monitor_events(Display* display) {
     g_source_set_priority(source, G_PRIORITY_HIGH_IDLE + 50);
     g_source_set_can_recurse(source, TRUE);
     g_source_attach(source, NULL);
-//    return source;
+
 }
 
 static gboolean x11_event_source_prepare(GSource* source, gint* timeout) {
@@ -230,22 +228,6 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
     return TRUE;
 }
 
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-static void init_threads() {
-    gboolean is_g_thread_get_initialized = FALSE;
-    if (glib_check_version(2, 32, 0)) { // < 2.32
-        if (!glib_check_version(2, 20, 0)) {
-            is_g_thread_get_initialized = g_thread_get_initialized();
-        }
-        if (!is_g_thread_get_initialized) {
-            g_thread_init(NULL);
-        }
-    }
-    gdk_threads_init();
-}
-#pragma GCC diagnostic pop
-
 jboolean gtk_verbose = JNI_FALSE;
 
 /*
@@ -263,10 +245,10 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
     gtk_verbose = verbose;
 
     env->ExceptionClear();
-    init_threads();
 
-    gdk_threads_enter();
     gtk_init(NULL, NULL);
+    Display *display = XOpenDisplay(NULL);
+    X_CURRENT_DISPLAY = display;
 
     return JNI_TRUE;
 }
@@ -313,26 +295,11 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
     (void)obj;
 
     mainEnv = env;
-//    process_events_prev = (GdkEventFunc) handler;
     disableGrab = (gboolean) _disableGrab;
 
-    glass_gdk_x11_display_set_window_scale(gdk_display_get_default(), 1);
-//    gdk_event_handler_set(process_events, NULL, NULL);
+//    glass_gdk_x11_display_set_window_scale(gdk_display_get_default(), 1);
 
-//    GdkScreen *default_gdk_screen = gdk_screen_get_default();
-//    if (default_gdk_screen != NULL) {
-//        g_signal_connect(G_OBJECT(default_gdk_screen), "monitors-changed",
-//                         G_CALLBACK(screen_settings_changed), NULL);
-//        g_signal_connect(G_OBJECT(default_gdk_screen), "size-changed",
-//                         G_CALLBACK(screen_settings_changed), NULL);
-//    }
-
-    //TODO: remove
-//    GdkWindow *root = gdk_screen_get_root_window(default_gdk_screen);
-//    gdk_window_set_events(root, static_cast<GdkEventMask>(gdk_window_get_events(root) | GDK_PROPERTY_CHANGE_MASK));
-    Display* display = gdk_x11_display_get_xdisplay(gdk_display_get_default());
-    X_CURRENT_DISPLAY = display;
-    x11_monitor_events(display);
+    x11_monitor_events(X_CURRENT_DISPLAY);
 }
 
 /*
@@ -349,39 +316,12 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1runLoop
     env->CallVoidMethod(launchable, jRunnableRun);
     CHECK_JNI_EXCEPTION(env);
 
-    // GTK installs its own X error handler that conflicts with AWT.
-    // During drag and drop, AWT hides errors so we need to hide them
-    // to avoid exit()'ing.  It's not clear that we don't want to hide
-    // X error all the time, otherwise FX will exit().
-    //
-    // A better solution would be to coordinate with AWT and save and
-    // restore the X handler.
 
-    // Disable X error handling
-#ifndef VERBOSE
-    if (!noErrorTrap) {
-        gdk_error_trap_push();
-    }
-#endif
-
-    gtk_main();
-
-    // When the last JFrame closes and DISPOSE_ON_CLOSE is specified,
-    // Java exits with an X error. X error are hidden during the FX
-    // event loop and should be restored when the event loop exits. Unfortunately,
-    // this is too early. The fix is to never restore X errors.
-    //
-    // See RT-21408 & RT-20756
-
-    // Restore X error handling
-    // #ifndef VERBOSE
-    //     if (!noErrorTrap) {
-    //         gdk_error_trap_pop();
-    //     }
-    // #endif
-
-    gdk_threads_leave();
-
+    mainLoop = g_main_loop_new(NULL, FALSE);
+    g_print("run loop\n");
+    g_main_loop_run(mainLoop);
+    g_print("unref loop\n");
+    g_main_loop_unref(mainLoop);
 }
 
 /*
@@ -395,7 +335,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1terminateLoop
     (void)env;
     (void)obj;
 
-    gtk_main_quit();
+    g_print("terminateLoop\n");
+    g_main_loop_unref(mainLoop);
 }
 
 /*
@@ -408,6 +349,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1submitForLater
 {
     (void)obj;
 
+
+    g_print("submitForLaterInvocation\n");
     RunnableContext* context = (RunnableContext*)malloc(sizeof(RunnableContext));
     context->runnable = env->NewGlobalRef(runnable);
     g_idle_add_full(G_PRIORITY_HIGH_IDLE + 30, call_runnable, context, NULL);
@@ -424,7 +367,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication_enterNestedEvent
     (void)env;
     (void)obj;
 
-    gtk_main();
+    g_print("enterNestedEventLoopImpl\n");
+    g_main_loop_ref(mainLoop);
 }
 
 /*
@@ -438,7 +382,8 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication_leaveNestedEvent
     (void)env;
     (void)obj;
 
-    gtk_main_quit();
+    g_print("leaveNestedEventLoopImpl\n");
+    g_main_loop_unref(mainLoop);
 }
 
 /*
@@ -544,145 +489,10 @@ JNIEXPORT jboolean JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1supportsTr
     (void)env;
     (void)obj;
 
-    return gdk_display_supports_composite(gdk_display_get_default())
-            && gdk_screen_is_composited(gdk_screen_get_default());
+    //FIXME
+    return true;
+//    return gdk_display_supports_composite(gdk_display_get_default())
+//            && gdk_screen_is_composited(gdk_screen_get_default());
 }
 
 } // extern "C"
-
-bool is_window_enabled_for_event(GdkWindow * window, WindowContext *ctx, gint event_type) {
-    if (gdk_window_is_destroyed(window)) {
-        return FALSE;
-    }
-
-    /*
-     * GDK_DELETE can be blocked for disabled window e.q. parent window
-     * which prevents from closing it
-     */
-    switch (event_type) {
-        case GDK_CONFIGURE:
-        case GDK_DESTROY:
-        case GDK_EXPOSE:
-        case GDK_DAMAGE:
-        case GDK_WINDOW_STATE:
-        case GDK_FOCUS_CHANGE:
-            return TRUE;
-            break;
-    }//switch
-
-    if (ctx != NULL ) {
-        return ctx->isEnabled();
-    }
-    return TRUE;
-}
-
-//TODO: remove
-/*
-static void process_events(GdkEvent* event, gpointer data)
-{
-    GdkWindow* window = event->any.window;
-    WindowContext *ctx = window != NULL ? (WindowContext*)
-        g_object_get_data(G_OBJECT(window), GDK_WINDOW_DATA_CONTEXT) : NULL;
-
-    if ((window != NULL)
-            && !is_window_enabled_for_event(window, ctx, event->type)) {
-        return;
-    }
-
-    if (ctx != NULL && ctx->hasIME() && ctx->filterIME(event)) {
-        return;
-    }
-
-    glass_evloop_call_hooks(event);
-
-    if (ctx != NULL) {
-        EventsCounterHelper helper(ctx);
-        try {
-            switch (event->type) {
-                case GDK_PROPERTY_NOTIFY:
-                    ctx->process_property_notify(&event->property);
-                    gtk_main_do_event(event);
-                    break;
-                case GDK_CONFIGURE:
-                    ctx->process_configure(&event->configure);
-                    gtk_main_do_event(event);
-                    break;
-                case GDK_FOCUS_CHANGE:
-                    ctx->process_focus(&event->focus_change);
-                    gtk_main_do_event(event);
-                    break;
-                case GDK_DESTROY:
-                    destroy_and_delete_ctx(ctx);
-                    gtk_main_do_event(event);
-                    break;
-                case GDK_DELETE:
-                    ctx->process_delete();
-                    break;
-                case GDK_EXPOSE:
-                case GDK_DAMAGE:
-                    ctx->process_expose(&event->expose);
-                    break;
-                case GDK_WINDOW_STATE:
-                    ctx->process_state(&event->window_state);
-                    gtk_main_do_event(event);
-                    break;
-                case GDK_BUTTON_PRESS:
-                case GDK_BUTTON_RELEASE:
-                    ctx->process_mouse_button(&event->button);
-                    break;
-                case GDK_MOTION_NOTIFY:
-                    ctx->process_mouse_motion(&event->motion);
-                    gdk_event_request_motions(&event->motion);
-                    break;
-                case GDK_SCROLL:
-                    ctx->process_mouse_scroll(&event->scroll);
-                    break;
-                case GDK_ENTER_NOTIFY:
-                case GDK_LEAVE_NOTIFY:
-                    ctx->process_mouse_cross(&event->crossing);
-                    break;
-                case GDK_KEY_PRESS:
-                case GDK_KEY_RELEASE:
-                    ctx->process_key(&event->key);
-                    break;
-                case GDK_DROP_START:
-                case GDK_DRAG_ENTER:
-                case GDK_DRAG_LEAVE:
-                case GDK_DRAG_MOTION:
-                    process_dnd_target(ctx, &event->dnd);
-                    break;
-                case GDK_MAP:
-                    ctx->process_map();
-                    // fall-through
-                case GDK_UNMAP:
-                case GDK_CLIENT_EVENT:
-                case GDK_VISIBILITY_NOTIFY:
-                case GDK_SETTING:
-                case GDK_OWNER_CHANGE:
-                    gtk_main_do_event(event);
-                    break;
-                default:
-                    break;
-            }
-        } catch (jni_exception&) {
-        }
-    } else {
-
-        if (window == gdk_screen_get_root_window(gdk_screen_get_default())) {
-            if (event->any.type == GDK_PROPERTY_NOTIFY) {
-                if (event->property.atom == gdk_atom_intern_static_string("_NET_WORKAREA")
-                        || event->property.atom == gdk_atom_intern_static_string("_NET_CURRENT_DESKTOP")) {
-                    screen_settings_changed(gdk_screen_get_default(), NULL);
-                }
-            }
-        }
-
-        //process only for non-FX windows
-        if (process_events_prev != NULL) {
-            (*process_events_prev)(event, data);
-        } else {
-            gtk_main_do_event(event);
-        }
-    }
-}
-*/

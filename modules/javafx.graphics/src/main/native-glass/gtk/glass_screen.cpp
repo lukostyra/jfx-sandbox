@@ -217,12 +217,3 @@ jobjectArray rebuild_screens(JNIEnv* env) {
 //    //Note: we are relying on the fact that javafx_screen_id == gdk_monitor_id
 //    return gdk_screen_get_monitor_at_point(gdk_screen_get_default(), x, y);
 //}
-
-
-//void screen_settings_changed(GdkScreen* screen, gpointer user_data) {
-//    (void)screen;
-//    (void)user_data;
-//
-//    mainEnv->CallStaticVoidMethod(jScreenCls, jScreenNotifySettingsChanged);
-//    LOG_EXCEPTION(mainEnv);
-//}
