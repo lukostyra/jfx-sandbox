@@ -25,6 +25,9 @@
 
 #include <X11/extensions/Xdamage.h>
 #include <X11/extensions/Xrandr.h>
+#include <X11/extensions/Xcomposite.h>
+#include <X11/extensions/sync.h>
+#include <X11/XKBlib.h>
 #include <X11/Xresource.h>
 #include <gdk/gdk.h>
 #include <gdk/gdkx.h>
@@ -83,7 +86,10 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
 typedef struct x11_source {
     GSource source;
     Display *display;
-    int rr_event_base;
+    int randr_event_base;
+    int xsync_event_base;
+    int xdamage_event_base;
+    int xkb_event_type;
 } X11Source;
 
 static GSourceFuncs x11_event_funcs = {
@@ -95,18 +101,8 @@ static GSourceFuncs x11_event_funcs = {
     NULL
 };
 
-static void x11_monitor_events(Display* display) {
-    GSource *source;
-
-    source = g_source_new (&x11_event_funcs, sizeof(X11Source));
-    ((X11Source*)source)->display = display;
-
-    int rr_event_base, rr_error_base;
-    Bool have_rr = XRRQueryExtension(display, &rr_event_base, &rr_error_base);
-    if (have_rr) {
-        ((X11Source*)source)->rr_event_base = rr_event_base;
-        XRRSelectInput(display, DefaultRootWindow(display), RRScreenChangeNotifyMask);
-    }
+static void x11_monitor_events(GSource* source) {
+    Display *display = ((X11Source *)source)->display;
 
     GPollFD dpy_pollfd = {
         XConnectionNumber(display),
@@ -135,7 +131,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
     XEvent xevent;
 
     Display *display = ((X11Source*) source)->display;
-    int rr_event_base = ((X11Source*) source)->rr_event_base;
+    int randr_event_base = ((X11Source*) source)->randr_event_base;
     WindowContext* ctx;
 
     while (XPending(display)) {
@@ -144,7 +140,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
         if (xevent.xany.window == DefaultRootWindow(display)) {
             g_print("============> Root Window Event %d\n", xevent.type);
 
-            if (rr_event_base + RRScreenChangeNotify == xevent.type) {
+            if (randr_event_base + RRScreenChangeNotify == xevent.type) {
                 g_print("============> UPDATE SCREENS %d\n", xevent.type);
                 mainEnv->CallStaticVoidMethod(jScreenCls, jScreenNotifySettingsChanged);
                 LOG_EXCEPTION(mainEnv);
@@ -250,6 +246,51 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
     Display *display = XOpenDisplay(NULL);
     X_CURRENT_DISPLAY = display;
 
+    GSource *source = g_source_new(&x11_event_funcs, sizeof(X11Source));
+
+    X11Source *xsrc = ((X11Source *) source);
+    xsrc->display = display;
+
+    int major, minor, ignore;
+
+    //XrandR
+    if (XRRQueryExtension(display, &xsrc->randr_event_base, &ignore)) {
+        XRRSelectInput(display, DefaultRootWindow(display), RRScreenChangeNotifyMask);
+    }
+
+    if (XSyncQueryExtension(display, &xsrc->xsync_event_base, &ignore)) {
+        XSyncInitialize(display, &major, &minor);
+    }
+    
+    XDamageQueryExtension(display, &xsrc->xdamage_event_base, &ignore);
+
+    gint xkb_major = XkbMajorVersion;
+    gint xkb_minor = XkbMinorVersion;
+
+    if (XkbLibraryVersion(&xkb_major, &xkb_minor)) {
+        xkb_major = XkbMajorVersion;
+        xkb_minor = XkbMinorVersion;
+
+        if (XkbQueryExtension(display, NULL, &xsrc->xkb_event_type, NULL, &major, &minor)) {
+            Bool detectable_autorepeat_supported;
+
+            XkbSelectEvents(display,
+                            XkbUseCoreKbd,
+                            XkbNewKeyboardNotifyMask | XkbMapNotifyMask | XkbStateNotifyMask,
+                            XkbNewKeyboardNotifyMask | XkbMapNotifyMask | XkbStateNotifyMask);
+
+            XkbSelectEventDetails(display,
+                                  XkbUseCoreKbd, XkbStateNotify,
+                                  XkbAllStateComponentsMask,
+                                  XkbModifierStateMask|XkbGroupStateMask);
+
+            XkbSetDetectableAutoRepeat(display, True, &detectable_autorepeat_supported);
+//        TODO: handle those events
+        }
+    }
+
+    x11_monitor_events(source);
+
     return JNI_TRUE;
 }
 
@@ -299,7 +340,6 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1init
 
 //    glass_gdk_x11_display_set_window_scale(gdk_display_get_default(), 1);
 
-    x11_monitor_events(X_CURRENT_DISPLAY);
 }
 
 /*
@@ -315,7 +355,6 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1runLoop
 
     env->CallVoidMethod(launchable, jRunnableRun);
     CHECK_JNI_EXCEPTION(env);
-
 
     mainLoop = g_main_loop_new(NULL, FALSE);
     g_print("run loop\n");
@@ -489,10 +528,9 @@ JNIEXPORT jboolean JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1supportsTr
     (void)env;
     (void)obj;
 
-    //FIXME
-    return true;
-//    return gdk_display_supports_composite(gdk_display_get_default())
-//            && gdk_screen_is_composited(gdk_screen_get_default());
+    int ignore;
+
+    return XCompositeQueryExtension(X_CURRENT_DISPLAY, &ignore, &ignore);
 }
 
 } // extern "C"

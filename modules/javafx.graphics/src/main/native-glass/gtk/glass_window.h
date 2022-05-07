@@ -25,13 +25,13 @@
 #ifndef GLASS_WINDOW_H
 #define        GLASS_WINDOW_H
 
-//TODO: remove
-#include <gtk/gtk.h>
+
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/Xdamage.h>
 #include <X11/extensions/shape.h>
+#include <glib.h>
 
 #include <jni.h>
 #include <set>
@@ -122,10 +122,10 @@ class WindowContextTop;
 class WindowContext {
 public:
     virtual bool isEnabled() = 0;
-    virtual bool hasIME() = 0;
-    virtual bool filterIME(GdkEvent *) = 0;
-    virtual void enableOrResetIME() = 0;
-    virtual void disableIME() = 0;
+//    virtual bool hasIME() = 0;
+//    virtual bool filterIME(GdkEvent *) = 0;
+//    virtual void enableOrResetIME() = 0;
+//    virtual void disableIME() = 0;
     virtual void paint(void* data, jint width, jint height) = 0;
     virtual WindowFrameExtents get_frame_extents() = 0;
 
@@ -149,7 +149,7 @@ public:
     virtual void set_maximum_size(int, int) = 0;
     virtual void set_minimized(bool) = 0;
     virtual void set_maximized(bool) = 0;
-    virtual void set_icon(GdkPixbuf*) = 0;
+    virtual void set_icon(Pixmap*) = 0;
     virtual void restack(bool) = 0;
     virtual void set_cursor(Cursor) = 0;
     virtual void set_modal(bool, WindowContext* parent = NULL) = 0;
@@ -169,8 +169,8 @@ public:
     virtual void process_mouse_button(XButtonEvent*) = 0;
     virtual void process_mouse_motion(XMotionEvent *) = 0;
     virtual void process_mouse_cross(XCrossingEvent*) = 0;
-    virtual void process_key(GdkEventKey*) = 0;
-    virtual void process_state(GdkEventWindowState*) = 0;
+    virtual void process_key(XKeyEvent*) = 0;
+//    virtual void process_state(GdkEventWindowState*) = 0;
     virtual void process_visibility(XVisibilityEvent*) = 0;
 
     virtual void notify_state(jint) = 0;
@@ -213,8 +213,6 @@ protected:
     Visual* visual;
     unsigned int depth;
 
-    GdkWMFunction gdk_windowManagerFunctions;
-
     int visibility_state;
     bool is_iconified;
     bool is_maximized;
@@ -240,12 +238,11 @@ protected:
     static WindowContext* sm_mouse_drag_window;
 public:
     bool isEnabled();
-    bool hasIME();
-    bool filterIME(GdkEvent *);
-    void enableOrResetIME();
-    void disableIME();
+//    bool hasIME();
+//    bool filterIME(GdkEvent *);
+//    void enableOrResetIME();
+//    void disableIME();
     void paint(void*, jint, jint);
-    GdkWindow *get_gdk_window();
     XID get_window_xid();
     jobject get_jwindow();
     jobject get_jview();
@@ -274,8 +271,8 @@ public:
     void process_mouse_button(XButtonEvent*);
     void process_mouse_motion(XMotionEvent*);
     void process_mouse_cross(XCrossingEvent*);
-    void process_key(GdkEventKey*);
-    void process_state(GdkEventWindowState*);
+    void process_key(XKeyEvent*);
+//    void process_state(GdkEventWindowState*);
     void process_visibility(XVisibilityEvent*);
     void notify_state(jint);
 
@@ -287,8 +284,8 @@ public:
     ~WindowContextBase();
 protected:
     virtual void applyShapeMask(void*, uint width, uint height) = 0;
-private:
-    bool im_filter_keypress(GdkEventKey*);
+//private:
+//    bool im_filter_keypress(GdkEventKey*);
 };
 
 class WindowContextTop: public WindowContextBase {
@@ -344,7 +341,7 @@ public:
     void set_enabled(bool);
     void set_minimum_size(int, int);
     void set_maximum_size(int, int);
-    void set_icon(GdkPixbuf*);
+    void set_icon(Pixmap*);
     void restack(bool);
     void set_modal(bool, WindowContext* parent = NULL);
     void set_gravity(float, float);
@@ -359,7 +356,6 @@ public:
 
     void set_owner(WindowContext*);
 
-    GtkWindow *get_gtk_window();
     void detach_from_java();
 protected:
     void applyShapeMask(void*, uint width, uint height);

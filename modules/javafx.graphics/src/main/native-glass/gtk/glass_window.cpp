@@ -86,38 +86,38 @@ void WindowContextBase::notify_state(jint glass_state) {
        CHECK_JNI_EXCEPTION(mainEnv);
     }
 }
-
-void WindowContextBase::process_state(GdkEventWindowState* event) {
-    if (event->changed_mask &
-            (GDK_WINDOW_STATE_ICONIFIED | GDK_WINDOW_STATE_MAXIMIZED)) {
-
-        if (event->changed_mask & GDK_WINDOW_STATE_ICONIFIED) {
-            is_iconified = event->new_window_state & GDK_WINDOW_STATE_ICONIFIED;
-        }
-        if (event->changed_mask & GDK_WINDOW_STATE_MAXIMIZED) {
-            is_maximized = event->new_window_state & GDK_WINDOW_STATE_MAXIMIZED;
-        }
-
-        jint stateChangeEvent;
-
-        if (is_iconified) {
-            stateChangeEvent = com_sun_glass_events_WindowEvent_MINIMIZE;
-        } else if (is_maximized) {
-            stateChangeEvent = com_sun_glass_events_WindowEvent_MAXIMIZE;
-        } else {
-            stateChangeEvent = com_sun_glass_events_WindowEvent_RESTORE;
-            if ((gdk_windowManagerFunctions & GDK_FUNC_MINIMIZE) == 0) {
-                // in this case - the window manager will not support the programatic
-                // request to iconify - so we need to restore it now.
-//                gdk_window_set_functions(gdk_window, gdk_windowManagerFunctions);
-            }
-        }
-
-        notify_state(stateChangeEvent);
-    } else if (event->changed_mask & GDK_WINDOW_STATE_ABOVE) {
-        notify_on_top( event->new_window_state & GDK_WINDOW_STATE_ABOVE);
-    }
-}
+//
+//void WindowContextBase::process_state(GdkEventWindowState* event) {
+//    if (event->changed_mask &
+//            (GDK_WINDOW_STATE_ICONIFIED | GDK_WINDOW_STATE_MAXIMIZED)) {
+//
+//        if (event->changed_mask & GDK_WINDOW_STATE_ICONIFIED) {
+//            is_iconified = event->new_window_state & GDK_WINDOW_STATE_ICONIFIED;
+//        }
+//        if (event->changed_mask & GDK_WINDOW_STATE_MAXIMIZED) {
+//            is_maximized = event->new_window_state & GDK_WINDOW_STATE_MAXIMIZED;
+//        }
+//
+//        jint stateChangeEvent;
+//
+//        if (is_iconified) {
+//            stateChangeEvent = com_sun_glass_events_WindowEvent_MINIMIZE;
+//        } else if (is_maximized) {
+//            stateChangeEvent = com_sun_glass_events_WindowEvent_MAXIMIZE;
+//        } else {
+//            stateChangeEvent = com_sun_glass_events_WindowEvent_RESTORE;
+//            if ((gdk_windowManagerFunctions & GDK_FUNC_MINIMIZE) == 0) {
+//                // in this case - the window manager will not support the programatic
+//                // request to iconify - so we need to restore it now.
+////                gdk_window_set_functions(gdk_window, gdk_windowManagerFunctions);
+//            }
+//        }
+//
+//        notify_state(stateChangeEvent);
+//    } else if (event->changed_mask & GDK_WINDOW_STATE_ABOVE) {
+//        notify_on_top( event->new_window_state & GDK_WINDOW_STATE_ABOVE);
+//    }
+//}
 
 void WindowContextBase::process_visibility(XVisibilityEvent* event) {
     visibility_state = event->state;
@@ -404,7 +404,7 @@ void WindowContextBase::process_mouse_cross(XCrossingEvent* event) {
     }
 }
 
-void WindowContextBase::process_key(GdkEventKey* event) {
+void WindowContextBase::process_key(XKeyEvent* event) {
 //    bool press = event->type == GDK_KEY_PRESS;
 //    jint glassKey = get_glass_key(event);
 //    jint glassModifier = gdk_modifier_mask_to_glass(event->state);
@@ -1310,7 +1310,7 @@ void WindowContextTop::set_maximum_size(int w, int h) {
     update_window_constraints();
 }
 
-void WindowContextTop::set_icon(GdkPixbuf* pixbuf) {
+void WindowContextTop::set_icon(Pixmap* pixmap) {
 //    gtk_window_set_icon(GTK_WINDOW(gtk_widget), pixbuf);
 }
 
