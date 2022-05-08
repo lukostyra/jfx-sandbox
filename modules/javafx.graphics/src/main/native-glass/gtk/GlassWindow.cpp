@@ -404,16 +404,22 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkWindow__1setIcon
   (JNIEnv * env, jobject obj, jlong ptr, jobject pixels)
 {
     (void)obj;
-//
-//    WindowContext* ctx = JLONG_TO_WINDOW_CTX(ptr);
-//    GdkPixbuf *pixbuf = NULL;
-//    if (pixels != NULL) {
-//        env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&pixbuf));
+
+    WindowContext* ctx = JLONG_TO_WINDOW_CTX(ptr);
+
+    Pixmap pixmap;
+    if (pixels != NULL) {
+        env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&pixmap));
+    }
+
+    if (!EXCEPTION_OCCURED(env)) {
+        ctx->set_icon(pixmap);
+    }
+
+//TODO unset the icon?
+//    if (pixmap != NULL) {
+//        //TODO: free pixmap XFreePixmap
 //    }
-//    if (!EXCEPTION_OCCURED(env)) {
-//        ctx->set_icon(pixbuf);
-//    }
-//    if (pixbuf != NULL) g_object_unref(pixbuf);
 }
 
 /*
@@ -581,7 +587,6 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkWindow__1setGravity
 
     WindowContext* ctx = JLONG_TO_WINDOW_CTX(ptr);
     ctx->set_gravity(xGravity, yGravity);
-
 }
 
 } // extern "C"

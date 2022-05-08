@@ -1310,8 +1310,20 @@ void WindowContextTop::set_maximum_size(int w, int h) {
     update_window_constraints();
 }
 
-void WindowContextTop::set_icon(Pixmap* pixmap) {
-//    gtk_window_set_icon(GTK_WINDOW(gtk_widget), pixbuf);
+void WindowContextTop::set_icon(Pixmap pixmap) {
+//    g_print("==> set icon ------------ \n");
+//    if (data) {
+//        XChangeProperty(display,
+//                        xwindow,
+//                        XInternAtom(display, "_NET_WM_ICON", True),
+//                        XA_CARDINAL, 32,
+//                        PropModeReplace,
+//                        (guchar*) data, sizeof(data));
+//    } else {
+//        XDeleteProperty(display,
+//                        xwindow,
+//                        XInternAtom(display, "_NET_WM_ICON", True));
+//    }
 }
 
 void WindowContextTop::restack(bool restack) {
