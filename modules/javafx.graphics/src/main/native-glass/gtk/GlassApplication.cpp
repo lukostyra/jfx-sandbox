@@ -29,8 +29,7 @@
 #include <X11/extensions/sync.h>
 #include <X11/XKBlib.h>
 #include <X11/Xresource.h>
-#include <gdk/gdk.h>
-#include <gdk/gdkx.h>
+
 #include <gtk/gtk.h>
 #include <glib.h>
 
@@ -104,20 +103,31 @@ static GSourceFuncs x11_event_funcs = {
     NULL
 };
 
+static int DoubleClickTime = -1;
+static int DoubleClickDistance = -1;
+
 static void setting_notify_cb (const char       *name,
-                                XSettingsAction   action,
-                                XSettingsSetting *setting,
-                                void             *data) {
-    g_print("SETTING %s\n", name);
+                               XSettingsAction   action,
+                               XSettingsSetting *setting,
+                               void             *data) {
+//    g_print("SETTING %s\n", name);
 
     switch (action) {
         case XSETTINGS_ACTION_NEW:
-            break;
         case XSETTINGS_ACTION_CHANGED:
+            if (strcmp(name, "Net/DoubleClickTime") == 0) {
+                DoubleClickTime = setting->data.v_int;
+                g_print("DoubleClickTime = %d\n", DoubleClickTime);
+            } else if (strcmp(name, "Net/DoubleClickDistance") == 0) {
+                DoubleClickDistance = setting->data.v_int;
+                g_print("DoubleClickDistance = %d\n", DoubleClickDistance);
+            }
             break;
         case XSETTINGS_ACTION_DELETED:
             break;
     }
+
+    xsettings_setting_free(setting);
 }
 
 static void x11_monitor_events(GSource* source) {
@@ -264,6 +274,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
 
     env->ExceptionClear();
 
+    //TODO: remove
     gtk_init(NULL, NULL);
     Display *display = XOpenDisplay(NULL);
     X_CURRENT_DISPLAY = display;
@@ -415,7 +426,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1submitForLater
     (void)obj;
 
 
-    g_print("submitForLaterInvocation\n");
+//    g_print("submitForLaterInvocation\n");
     RunnableContext* context = (RunnableContext*)malloc(sizeof(RunnableContext));
     context->runnable = env->NewGlobalRef(runnable);
     g_idle_add_full(G_PRIORITY_HIGH_IDLE + 30, call_runnable, context, NULL);
@@ -507,11 +518,7 @@ JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkApplication_staticView_1get
     (void)env;
     (void)obj;
 
-    static gint multi_click_time = -1;
-    if (multi_click_time == -1) {
-        g_object_get(gtk_settings_get_default(), "gtk-double-click-time", &multi_click_time, NULL);
-    }
-    return (jlong)multi_click_time;
+    return DoubleClickTime;
 }
 
 /*
@@ -525,12 +532,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication_staticView_1getM
     (void)env;
     (void)obj;
 
-    static gint multi_click_dist = -1;
-
-    if (multi_click_dist == -1) {
-        g_object_get(gtk_settings_get_default(), "gtk-double-click-distance", &multi_click_dist, NULL);
-    }
-    return multi_click_dist;
+    return DoubleClickDistance;
 }
 
 /*
@@ -541,7 +543,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication_staticView_1getM
 JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication_staticView_1getMultiClickMaxY
   (JNIEnv * env, jobject obj)
 {
-    return Java_com_sun_glass_ui_gtk_GtkApplication_staticView_1getMultiClickMaxX(env, obj);
+    return DoubleClickDistance;
 }
 
 /*
