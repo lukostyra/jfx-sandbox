@@ -47,6 +47,7 @@
 #include "glass_dnd.h"
 #include "glass_window.h"
 #include "glass_screen.h"
+#include "xsettings-client.h"
 
 static void process_events(GdkEvent*, gpointer);
 
@@ -77,6 +78,7 @@ static gboolean call_runnable (gpointer data)
     return FALSE;
 }
 
+
 extern "C" {
 
 static gboolean x11_event_source_prepare(GSource* source, gint* timeout);
@@ -90,6 +92,7 @@ typedef struct x11_source {
     int xsync_event_base;
     int xdamage_event_base;
     int xkb_event_type;
+    XSettingsClient *settings_client;
 } X11Source;
 
 static GSourceFuncs x11_event_funcs = {
@@ -100,6 +103,22 @@ static GSourceFuncs x11_event_funcs = {
     NULL,
     NULL
 };
+
+static void setting_notify_cb (const char       *name,
+                                XSettingsAction   action,
+                                XSettingsSetting *setting,
+                                void             *data) {
+    g_print("SETTING %s\n", name);
+
+    switch (action) {
+        case XSETTINGS_ACTION_NEW:
+            break;
+        case XSETTINGS_ACTION_CHANGED:
+            break;
+        case XSETTINGS_ACTION_DELETED:
+            break;
+    }
+}
 
 static void x11_monitor_events(GSource* source) {
     Display *display = ((X11Source *)source)->display;
@@ -115,7 +134,6 @@ static void x11_monitor_events(GSource* source) {
     g_source_set_priority(source, G_PRIORITY_HIGH_IDLE + 50);
     g_source_set_can_recurse(source, TRUE);
     g_source_attach(source, NULL);
-
 }
 
 static gboolean x11_event_source_prepare(GSource* source, gint* timeout) {
@@ -130,17 +148,21 @@ static gboolean x11_event_source_check(GSource* source) {
 static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback, gpointer data) {
     XEvent xevent;
 
-    Display *display = ((X11Source*) source)->display;
-    int randr_event_base = ((X11Source*) source)->randr_event_base;
+    X11Source *xsrc = ((X11Source*) source);
+    Display *display = xsrc->display;
     WindowContext* ctx;
 
     while (XPending(display)) {
         XNextEvent(display, &xevent);
 
+        if (xsettings_client_process_event(xsrc->settings_client, &xevent)) {
+            continue;
+        }
+
         if (xevent.xany.window == DefaultRootWindow(display)) {
             g_print("============> Root Window Event %d\n", xevent.type);
 
-            if (randr_event_base + RRScreenChangeNotify == xevent.type) {
+            if (xsrc->randr_event_base + RRScreenChangeNotify == xevent.type) {
                 g_print("============> UPDATE SCREENS %d\n", xevent.type);
                 mainEnv->CallStaticVoidMethod(jScreenCls, jScreenNotifySettingsChanged);
                 LOG_EXCEPTION(mainEnv);
@@ -288,6 +310,10 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
 //        TODO: handle those events
         }
     }
+
+    //TODO: can get setting change notification
+    //TODO: xsettings_client_destroy
+    xsrc->settings_client = xsettings_client_new(display, DefaultScreen(display), setting_notify_cb, NULL, NULL);
 
     x11_monitor_events(source);
 
