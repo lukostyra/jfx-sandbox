@@ -135,40 +135,102 @@ JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkCursor__1createCursor
     g_print("CREATE CURSOR--------------->\n");
     Cursor cursor = 0;
 
-    cairo_surface_t* img_surface;
-    env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&img_surface));
+    cairo_surface_t* src_image;
+    env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&src_image));
 
     if (!EXCEPTION_OCCURED(env)) {
-        Pixmap pixmap;
+        Pixmap pixmap, mask_pixmap;
         XColor black;
 	    black.red = black.green = black.blue = 0;
 
-        int w, h, depth;
-        w = cairo_xlib_surface_get_width(img_surface);
-        h = cairo_xlib_surface_get_height(img_surface);
-        depth = cairo_xlib_surface_get_depth(img_surface);
+        int width, height, depth;
+        width = cairo_xlib_surface_get_width(src_image);
+        height = cairo_xlib_surface_get_height(src_image);
+        depth = cairo_xlib_surface_get_depth(src_image);
 
-        pixmap = XCreatePixmap(X_CURRENT_DISPLAY, DefaultRootWindow(X_CURRENT_DISPLAY), w, h, depth);
+        guint rowstride, data_stride, i, j;
+        guint8 *data, *mask_data, *pixels;
 
-        cairo_surface_t* x11_surface = cairo_xlib_surface_create_for_bitmap(X_CURRENT_DISPLAY,
-                                                                            pixmap,
-                                                                            DefaultScreenOfDisplay(X_CURRENT_DISPLAY),
-                                                                            w, h);
+        pixels = cairo_image_surface_get_data(src_image);
+        cairo_surface_destroy(src_image);
+        rowstride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, width);
+        data_stride = 4 * ((width + 31) / 32);
+        data = g_new0(guint8, data_stride * height);
+        mask_data = g_new0(guint8, data_stride * height);
 
-        cairo_t *context = cairo_create(x11_surface);
+        for (j = 0; j < height; j++) {
+            guint8 *src = pixels + j * rowstride;
+            guint8 *d = data + data_stride * j;
+            guint8 *md = mask_data + data_stride * j;
 
-        cairo_set_source_surface(context, img_surface, 0, 0);
-        cairo_set_operator(context, CAIRO_OPERATOR_SOURCE);
-        cairo_paint(context);
-        cairo_destroy(context);
-        cairo_surface_destroy(x11_surface);
-        cursor = XCreatePixmapCursor(X_CURRENT_DISPLAY, pixmap, pixmap, &black, &black, x, y);
-        XFreePixmap(X_CURRENT_DISPLAY, pixmap);
+            for (i = 0; i < width; i++) {
+                if (src[1] < 0x80) {
+                    *d |= 1 << (i % 8);
+                }
+
+                if (src[3] >= 0x80) {
+                    *md |= 1 << (i % 8);
+                }
+
+                src += 4;
+                if (i % 8 == 7) {
+                    d++;
+                    md++;
+                }
+            }
+        }
+
+        pixmap = XCreatePixmap(X_CURRENT_DISPLAY, DefaultRootWindow(X_CURRENT_DISPLAY), width, height, depth);
+        mask_pixmap = XCreatePixmap(X_CURRENT_DISPLAY, DefaultRootWindow(X_CURRENT_DISPLAY), width, height, depth);
+
+        cairo_surface_t* pm_sfc = cairo_xlib_surface_create_for_bitmap(X_CURRENT_DISPLAY,
+                                                                       pixmap,
+                                                                       DefaultScreenOfDisplay(X_CURRENT_DISPLAY),
+                                                                       width, height);
+
+        cairo_surface_t *image, *mask;
+        cairo_t *cr;
+
+        image = cairo_image_surface_create_for_data (data, CAIRO_FORMAT_A1, width, height, data_stride);
+        cr = cairo_create(pm_sfc);
+        cairo_set_source_surface(cr, image, 0, 0);
+        cairo_surface_destroy(image);
+        cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+        cairo_paint(cr);
+        cairo_destroy(cr);
+
+
+        mask = cairo_xlib_surface_create_for_bitmap(X_CURRENT_DISPLAY,
+                                                   mask_pixmap,
+                                                   DefaultScreenOfDisplay(X_CURRENT_DISPLAY),
+                                                   width, height);
+        cr = cairo_create(mask);
+        image = cairo_image_surface_create_for_data(mask_data, CAIRO_FORMAT_A1, width, height, data_stride);
+        cairo_set_source_surface(cr, image, 0, 0);
+        cairo_surface_destroy(image);
+        cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+        cairo_paint(cr);
+        cairo_destroy(cr);
+
+
+        cursor = XCreatePixmapCursor(X_CURRENT_DISPLAY,
+                                    cairo_xlib_surface_get_drawable(pm_sfc),
+                                    cairo_xlib_surface_get_drawable(mask),
+                                    &black, &black, x, y);
+
+        cairo_surface_destroy(pm_sfc);
+        cairo_surface_destroy(mask);
+
+        g_free(data);
+        g_free(mask_data);
+
+//        XFreePixmap(X_CURRENT_DISPLAY, pixmap);
+//        XFreePixmap(X_CURRENT_DISPLAY, mask_pixmap);
 
         g_print("Created Cursor: %ld\n", cursor);
+    } else {
+        cairo_surface_destroy(src_image);
     }
-
-    cairo_surface_destroy(img_surface);
 
     return cursor;
 }
