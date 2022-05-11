@@ -35,6 +35,9 @@
 
 #include <com_sun_glass_ui_Window_Level.h>
 
+#include <X11/extensions/Xrender.h>
+#include <cairo/cairo-xlib.h>
+#include <cairo/cairo-xlib-xrender.h>
 #include <string.h>
 #include <algorithm>
 
@@ -473,15 +476,31 @@ void WindowContextBase::process_key(XKeyEvent* event) {
 }
 
 void WindowContextBase::paint(void* data, jint width, jint height) {
-    Pixmap pixmap = XCreatePixmapFromBitmapData(display, DefaultRootWindow(display), (char *) data, width, height, 0, 0, depth);
-    XCopyPlane(display, pixmap, xwindow, DefaultGC(display, DefaultScreen(display)), 0, 0, width, height, 0, 0, 1);
+    g_print("paint %d,%d\n", width, height);
+//	XRenderPictFormat *format;
+//	format = XRenderFindStandardFormat(display, PictStandardA1);
+//
+//    cairo_surface_t* x11_surface;
+//    x11_surface = cairo_xlib_surface_create_with_xrender_format(display, xwindow, DefaultScreenOfDisplay(display),
+//                                                                format, width, height);
+
+    cairo_surface_t* x11_surface;
+    x11_surface = cairo_xlib_surface_create(display, xwindow, visual, width, height);
+    cairo_surface_t* img_surface;
+    img_surface = cairo_image_surface_create_for_data((unsigned char*)data,
+                                                       CAIRO_FORMAT_ARGB32,
+                                                       width, height, width * 4);
+
+    cairo_t *context = cairo_create(x11_surface);
+
+    cairo_set_source_surface(context, img_surface, 0, 0);
+    cairo_set_operator(context, CAIRO_OPERATOR_SOURCE);
+    cairo_paint(context);
+    cairo_destroy(context);
+    cairo_surface_destroy(x11_surface);
+    cairo_surface_destroy(img_surface);
 
     XFlush(display);
-    XFreePixmap(display, pixmap);
-
-//    XImage* image = XCreateImage(display, visual, depth, ZPixmap, 0, (char*) data, width, height, 32, 0);
-//    XPutImage(display, xwindow, DefaultGC(display, DefaultScreen(display)), image, 0, 0, 0, 0, width, height);
-//    XDestroyImage(image);
 }
 
 void WindowContextBase::add_child(WindowContextTop* child) {
