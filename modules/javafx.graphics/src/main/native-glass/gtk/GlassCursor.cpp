@@ -132,14 +132,18 @@ JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkCursor__1createCursor
 {
     (void)obj;
 
+    g_print("CREATE CURSOR--------------->\n");
     Cursor cursor = 0;
 
     cairo_surface_t* img_surface;
     env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&img_surface));
 
     if (!EXCEPTION_OCCURED(env)) {
-        XColor color;
+        XColor black, white;
         Pixmap pixmap;
+
+        black.pixel = BlackPixel(X_CURRENT_DISPLAY, DefaultScreen(X_CURRENT_DISPLAY));
+        white.pixel = WhitePixel(X_CURRENT_DISPLAY, DefaultScreen(X_CURRENT_DISPLAY));
 
         int w, h, depth;
         w = cairo_xlib_surface_get_width(img_surface);
@@ -159,14 +163,16 @@ JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkCursor__1createCursor
         cairo_set_operator(context, CAIRO_OPERATOR_SOURCE);
         cairo_paint(context);
         cairo_destroy(context);
-        cursor = XCreatePixmapCursor(X_CURRENT_DISPLAY, pixmap, pixmap, &color, &color, x, y);
+        cursor = XCreatePixmapCursor(X_CURRENT_DISPLAY, pixmap, pixmap, &black, &white, x, y);
         cairo_surface_destroy(x11_surface);
         XFreePixmap(X_CURRENT_DISPLAY, pixmap);
+
+        g_print("Created Cursor: %ld\n", cursor);
     }
 
     cairo_surface_destroy(img_surface);
 
-    return PTR_TO_JLONG(&cursor);
+    return cursor;
 }
 
 /*

@@ -623,6 +623,7 @@ void WindowContextBase::set_cursor(Cursor cursor) {
 //                    WindowContextBase::sm_grab_window->get_gdk_window(), cursor, TRUE);
 //        }
 //    }
+    g_print("set_cursor: %ld\n", cursor);
     XDefineCursor(display, xwindow, cursor);
 }
 
