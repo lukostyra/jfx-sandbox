@@ -408,7 +408,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkWindow__1setIcon
 
     WindowContext* ctx = JLONG_TO_WINDOW_CTX(ptr);
 
-    cairo_surface_t* img_surface;
+    cairo_surface_t* img_surface = NULL;
     if (pixels != NULL) {
         env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&img_surface));
     }
@@ -417,7 +417,9 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkWindow__1setIcon
         ctx->set_icon(img_surface);
     }
 
-    cairo_surface_destroy(img_surface);
+    if (img_surface != NULL) {
+        cairo_surface_destroy(img_surface);
+    }
 }
 
 /*

@@ -1320,15 +1320,14 @@ void WindowContextTop::set_maximum_size(int w, int h) {
 }
 
 void WindowContextTop::set_icon(cairo_surface_t* img_surface) {
-    unsigned char *data = cairo_image_surface_get_data(img_surface);
     g_print("==> set icon ------------ \n");
-    if (data) {
+    if (img_surface) {
+        unsigned char *data = cairo_image_surface_get_data(img_surface);
         XChangeProperty(display,
                         xwindow,
                         XInternAtom(display, "_NET_WM_ICON", True),
                         XA_CARDINAL, 32,
-                        PropModeReplace,
-                        (guchar*) data, 1);
+                        PropModeReplace, data, 1);
     } else {
         XDeleteProperty(display,
                         xwindow,
