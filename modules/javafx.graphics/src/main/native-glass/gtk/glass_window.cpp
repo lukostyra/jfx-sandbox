@@ -1322,12 +1322,42 @@ void WindowContextTop::set_maximum_size(int w, int h) {
 void WindowContextTop::set_icon(cairo_surface_t* img_surface) {
     g_print("==> set icon ------------ \n");
     if (img_surface) {
-        unsigned char *data = cairo_image_surface_get_data(img_surface);
+        guchar *data = cairo_image_surface_get_data(img_surface);
+        gulong *pixels, *p;
+        int w, h, stride;
+        w = cairo_image_surface_get_width(img_surface);
+        h = cairo_image_surface_get_height(img_surface);
+        stride = cairo_format_stride_for_width(CAIRO_FORMAT_ARGB32, w);
+
+        int size = 2 + w * h;
+
+        pixels = (gulong*) g_malloc(size * sizeof(gulong));
+
+        p = pixels;
+        *p++ = w;
+        *p++ = h;
+
+        int x, y;
+        for (y = 0; y < h; y++) {
+            for (x = 0; x < w; x++) {
+                guchar a, r, g, b;
+
+                r = data[y*stride + x*4 + 0];
+                g = data[y*stride + x*4 + 1];
+                b = data[y*stride + x*4 + 2];
+                a = data[y*stride + x*4 + 3];
+
+                *p++ = a << 24 | r << 16 | g << 8 | b;
+            }
+        }
+
         XChangeProperty(display,
                         xwindow,
                         XInternAtom(display, "_NET_WM_ICON", True),
                         XA_CARDINAL, 32,
-                        PropModeReplace, data, 1);
+                        PropModeReplace, (guchar*) pixels, size);
+
+        g_free(pixels);
     } else {
         XDeleteProperty(display,
                         xwindow,
