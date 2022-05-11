@@ -35,9 +35,7 @@
 
 #include <com_sun_glass_ui_Window_Level.h>
 
-#include <X11/extensions/Xrender.h>
 #include <cairo/cairo-xlib.h>
-#include <cairo/cairo-xlib-xrender.h>
 #include <string.h>
 #include <algorithm>
 
@@ -476,14 +474,6 @@ void WindowContextBase::process_key(XKeyEvent* event) {
 }
 
 void WindowContextBase::paint(void* data, jint width, jint height) {
-    g_print("paint %d,%d\n", width, height);
-//	XRenderPictFormat *format;
-//	format = XRenderFindStandardFormat(display, PictStandardA1);
-//
-//    cairo_surface_t* x11_surface;
-//    x11_surface = cairo_xlib_surface_create_with_xrender_format(display, xwindow, DefaultScreenOfDisplay(display),
-//                                                                format, width, height);
-
     cairo_surface_t* x11_surface;
     x11_surface = cairo_xlib_surface_create(display, xwindow, visual, width, height);
     cairo_surface_t* img_surface;
@@ -1329,20 +1319,21 @@ void WindowContextTop::set_maximum_size(int w, int h) {
     update_window_constraints();
 }
 
-void WindowContextTop::set_icon(Pixmap pixmap) {
-//    g_print("==> set icon ------------ \n");
-//    if (data) {
-//        XChangeProperty(display,
-//                        xwindow,
-//                        XInternAtom(display, "_NET_WM_ICON", True),
-//                        XA_CARDINAL, 32,
-//                        PropModeReplace,
-//                        (guchar*) data, sizeof(data));
-//    } else {
-//        XDeleteProperty(display,
-//                        xwindow,
-//                        XInternAtom(display, "_NET_WM_ICON", True));
-//    }
+void WindowContextTop::set_icon(cairo_surface_t* img_surface) {
+    unsigned char *data = cairo_image_surface_get_data(img_surface);
+    g_print("==> set icon ------------ \n");
+    if (data) {
+        XChangeProperty(display,
+                        xwindow,
+                        XInternAtom(display, "_NET_WM_ICON", True),
+                        XA_CARDINAL, 32,
+                        PropModeReplace,
+                        (guchar*) data, 1);
+    } else {
+        XDeleteProperty(display,
+                        xwindow,
+                        XInternAtom(display, "_NET_WM_ICON", True));
+    }
 }
 
 void WindowContextTop::restack(bool restack) {

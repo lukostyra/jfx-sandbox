@@ -26,6 +26,7 @@
 #include <com_sun_glass_events_WindowEvent.h>
 #include <com_sun_glass_events_ViewEvent.h>
 
+#include <cairo/cairo-xlib.h>
 #include <cstdlib>
 #include <cstring>
 #include "glass_general.h"
@@ -407,19 +408,16 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkWindow__1setIcon
 
     WindowContext* ctx = JLONG_TO_WINDOW_CTX(ptr);
 
-    Pixmap pixmap;
+    cairo_surface_t* img_surface;
     if (pixels != NULL) {
-        env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&pixmap));
+        env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&img_surface));
     }
 
     if (!EXCEPTION_OCCURED(env)) {
-        ctx->set_icon(pixmap);
+        ctx->set_icon(img_surface);
     }
 
-//TODO unset the icon?
-//    if (pixmap != NULL) {
-//        //TODO: free pixmap XFreePixmap
-//    }
+    cairo_surface_destroy(img_surface);
 }
 
 /*

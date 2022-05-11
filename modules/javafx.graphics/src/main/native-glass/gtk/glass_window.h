@@ -31,6 +31,7 @@
 #include <X11/Xutil.h>
 #include <X11/extensions/Xdamage.h>
 #include <X11/extensions/shape.h>
+#include <cairo/cairo-xlib.h>
 #include <glib.h>
 
 #include <jni.h>
@@ -149,7 +150,7 @@ public:
     virtual void set_maximum_size(int, int) = 0;
     virtual void set_minimized(bool) = 0;
     virtual void set_maximized(bool) = 0;
-    virtual void set_icon(Pixmap) = 0;
+    virtual void set_icon(cairo_surface_t*) = 0;
     virtual void restack(bool) = 0;
     virtual void set_cursor(Cursor) = 0;
     virtual void set_modal(bool, WindowContext* parent = NULL) = 0;
@@ -341,7 +342,7 @@ public:
     void set_enabled(bool);
     void set_minimum_size(int, int);
     void set_maximum_size(int, int);
-    void set_icon(Pixmap);
+    void set_icon(cairo_surface_t*);
     void restack(bool);
     void set_modal(bool, WindowContext* parent = NULL);
     void set_gravity(float, float);

@@ -24,7 +24,7 @@
  */
 #include <com_sun_glass_ui_gtk_GtkCursor.h>
 
-#include <gdk/gdk.h>
+#include <cairo/cairo-xlib.h>
 #include <X11/Xcursor/Xcursor.h>
 #include <stdlib.h>
 #include <jni.h>
@@ -134,16 +134,37 @@ JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkCursor__1createCursor
 
     Cursor cursor = 0;
 
-    Pixmap pixmap;
-    env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&pixmap));
+    cairo_surface_t* img_surface;
+    env->CallVoidMethod(pixels, jPixelsAttachData, PTR_TO_JLONG(&img_surface));
 
     if (!EXCEPTION_OCCURED(env)) {
         XColor color;
-        g_print("XCreatePixmapCursor %ld\n", pixmap);
+        Pixmap pixmap;
+
+        int w, h, depth;
+        w = cairo_xlib_surface_get_width(img_surface);
+        h = cairo_xlib_surface_get_height(img_surface);
+        depth = cairo_xlib_surface_get_depth(img_surface);
+
+        pixmap = XCreatePixmap(X_CURRENT_DISPLAY, DefaultRootWindow(X_CURRENT_DISPLAY), w, h, depth);
+
+        cairo_surface_t* x11_surface = cairo_xlib_surface_create_for_bitmap(X_CURRENT_DISPLAY,
+                                                                            pixmap,
+                                                                            DefaultScreenOfDisplay(X_CURRENT_DISPLAY),
+                                                                            w, h);
+
+        cairo_t *context = cairo_create(x11_surface);
+
+        cairo_set_source_surface(context, img_surface, 0, 0);
+        cairo_set_operator(context, CAIRO_OPERATOR_SOURCE);
+        cairo_paint(context);
+        cairo_destroy(context);
         cursor = XCreatePixmapCursor(X_CURRENT_DISPLAY, pixmap, pixmap, &color, &color, x, y);
+        cairo_surface_destroy(x11_surface);
+        XFreePixmap(X_CURRENT_DISPLAY, pixmap);
     }
 
-    XFreePixmap(X_CURRENT_DISPLAY, pixmap);
+    cairo_surface_destroy(img_surface);
 
     return PTR_TO_JLONG(&cursor);
 }
