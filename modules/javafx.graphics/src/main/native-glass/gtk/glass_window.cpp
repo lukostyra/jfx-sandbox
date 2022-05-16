@@ -1343,9 +1343,9 @@ void WindowContextTop::set_icon(cairo_surface_t* img_surface) {
             for (x = 0; x < w; x++) {
                 guchar a, r, g, b;
 
-                r = data[y*stride + x*4 + 0];
+                b = data[y*stride + x*4 + 0];
                 g = data[y*stride + x*4 + 1];
-                b = data[y*stride + x*4 + 2];
+                r = data[y*stride + x*4 + 2];
                 a = data[y*stride + x*4 + 3];
 
                 *p++ = a << 24 | r << 16 | g << 8 | b;
