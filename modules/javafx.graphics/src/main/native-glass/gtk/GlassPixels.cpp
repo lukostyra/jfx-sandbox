@@ -79,7 +79,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkPixels__1attachInt
     *img_surface = cairo_image_surface_create_for_data((unsigned char*)dataRGBA,
                                                        CAIRO_FORMAT_ARGB32,
                                                        w, h, w * 4);
-
+    g_print("cairo_image_surface_create_for_data, %d, %d\n", w, h);
 
     if (array != NULL) {
         env->ReleasePrimitiveArrayCritical(array, data, 0);
