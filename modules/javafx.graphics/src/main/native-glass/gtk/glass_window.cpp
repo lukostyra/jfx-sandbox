@@ -421,11 +421,23 @@ void WindowContextBase::process_key(XKeyEvent* event) {
 
     KeySym keysym = XLookupKeysym(event, 0);
 
+    g_print("KEYSYM: %ld, %d\n", keysym, event->keycode);
+
     if (keysym != NoSymbol) {
         key = (jchar) keysym;
 
         if (key >= 'a' && key <= 'z' && (event->state & ControlMask)) {
             key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
+        } else {
+            switch (keysym) {
+                case 0xFF08 /* Backspace */: key =  '\b'; break;
+                case 0xFF09 /* Tab       */: key =  '\t'; break;
+                case 0xFF0A /* Linefeed  */: key =  '\n'; break;
+                case 0xFF0B /* Vert. Tab */: key =  '\v'; break;
+                case 0xFF0D /* Return    */: key =  '\r'; break;
+                case 0xFF1B /* Escape    */: key =  '\033'; break;
+                case 0xFFFF /* Delete    */: key =  '\177'; break;
+            }
         }
 
         if (key > 0) {
