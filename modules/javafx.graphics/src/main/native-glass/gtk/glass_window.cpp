@@ -716,7 +716,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     }
 
     if (!matched) {
-        g_print("DEPTH: %d\n", depth);
         XMatchVisualInfo(display, DefaultScreen(display), 32, TrueColor, &vinfo);
         //TODO: may not match
     }
@@ -1241,15 +1240,15 @@ void WindowContextTop::set_minimized(bool minimize) {
     is_iconified = minimize;
 
     change_wm_state(minimize,
-                    XInternAtom(display, "_NET_WM_STATE_HIDDEN", true), None);
+                    XInternAtom(display, "_NET_WM_STATE_HIDDEN", True), None);
 }
 
 void WindowContextTop::set_maximized(bool maximize) {
     is_maximized = maximize;
 
     change_wm_state(maximize,
-                    XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", true),
-                    XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", true));
+                    XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", True),
+                    XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", True));
 }
 
 void WindowContextTop::change_wm_state(bool add, Atom state1, Atom state2) {
@@ -1258,7 +1257,7 @@ void WindowContextTop::change_wm_state(bool add, Atom state1, Atom state2) {
     memset(&xclient, 0, sizeof (xclient));
     xclient.type = ClientMessage;
     xclient.window = xwindow;
-    xclient.message_type = XInternAtom(display, "_NET_WM_STATE", true);
+    xclient.message_type = XInternAtom(display, "_NET_WM_STATE", True);
     xclient.format = 32;
     xclient.data.l[0] = add ? 1 : 0;
     xclient.data.l[1] = state1;
@@ -1277,11 +1276,11 @@ void WindowContextTop::enter_fullscreen() {
 //
 //    XChangeProperty(display, xwindow, XInternAtom(display, "_NET_WM_STATE", true),
 //                    XA_WINDOW, 32, PropModeReplace, (unsigned char *) atoms, 1);
-    change_wm_state(true, XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", true), None);
+    change_wm_state(true, XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", True), None);
 }
 
 void WindowContextTop::exit_fullscreen() {
-    change_wm_state(false, XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", true), None);
+    change_wm_state(false, XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", True), None);
 //    XDeleteProperty(display, xwindow, XInternAtom(display, "_NET_WM_STATE", true));
 }
 
@@ -1513,9 +1512,12 @@ void WindowContextTop::set_level(int level) {
     }
     // We need to emulate always on top behaviour on child windows
 
-    if (!on_top_inherited()) {
-        update_ontop_tree(on_top);
-    }
+    change_wm_state(on_top,
+                    XInternAtom(display, "_NET_WM_STATE_ABOVE", True), None);
+
+//    if (!on_top_inherited()) {
+//        update_ontop_tree(on_top);
+//    }
 }
 
 void WindowContextTop::set_owner(WindowContext * owner_ctx) {
