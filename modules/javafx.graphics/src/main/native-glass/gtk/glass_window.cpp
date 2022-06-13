@@ -408,70 +408,58 @@ void WindowContextBase::process_mouse_cross(XCrossingEvent* event) {
 void WindowContextBase::process_key(XKeyEvent* event) {
     bool press = event->type == KeyPress;
 
-//    jint glassKey = get_glass_key(event);
-//    jint glassModifier = gdk_modifier_mask_to_glass(event->state);
-//    if (press) {
-//        glassModifier |= glass_key_to_modifier(glassKey);
-//    } else {
-//        glassModifier &= ~glass_key_to_modifier(glassKey);
-//    }
-//    jcharArray jChars = NULL;
-//    jchar key = gdk_keyval_to_unicode(event->keyval);
-//    if (key >= 'a' && key <= 'z' && (event->state & GDK_CONTROL_MASK)) {
-//        key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
-//    } else {
-//#ifdef GLASS_GTK2
-//        if (key == 0) {
-//            // Work around "bug" fixed in gtk-3.0:
-//            // http://mail.gnome.org/archives/commits-list/2011-March/msg06832.html
-//            switch (event->keyval) {
-//            case 0xFF08 /* Backspace */: key =  '\b';
-//            case 0xFF09 /* Tab       */: key =  '\t';
-//            case 0xFF0A /* Linefeed  */: key =  '\n';
-//            case 0xFF0B /* Vert. Tab */: key =  '\v';
-//            case 0xFF0D /* Return    */: key =  '\r';
-//            case 0xFF1B /* Escape    */: key =  '\033';
-//            case 0xFFFF /* Delete    */: key =  '\177';
-//            }
-//        }
-//#endif
-//    }
-//
-//    if (key > 0) {
-//        jChars = mainEnv->NewCharArray(1);
-//        if (jChars) {
-//            mainEnv->SetCharArrayRegion(jChars, 0, 1, &key);
-//            CHECK_JNI_EXCEPTION(mainEnv)
-//        }
-//    } else {
-//        jChars = mainEnv->NewCharArray(0);
-//    }
-//    if (jview) {
-//        if (press) {
-//            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-//                    com_sun_glass_events_KeyEvent_PRESS,
-//                    glassKey,
-//                    jChars,
-//                    glassModifier);
-//            CHECK_JNI_EXCEPTION(mainEnv)
-//
-//            if (jview && key > 0) { // TYPED events should only be sent for printable characters.
-//                mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-//                        com_sun_glass_events_KeyEvent_TYPED,
-//                        com_sun_glass_events_KeyEvent_VK_UNDEFINED,
-//                        jChars,
-//                        glassModifier);
-//                CHECK_JNI_EXCEPTION(mainEnv)
-//            }
-//        } else {
-//            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-//                    com_sun_glass_events_KeyEvent_RELEASE,
-//                    glassKey,
-//                    jChars,
-//                    glassModifier);
-//            CHECK_JNI_EXCEPTION(mainEnv)
-//        }
-//    }
+    jint glassKey = get_glass_key(event);
+    jint glassModifier = xlib_modifier_mask_to_glass(event->state);
+    if (press) {
+        glassModifier |= glass_key_to_modifier(glassKey);
+    } else {
+        glassModifier &= ~glass_key_to_modifier(glassKey);
+    }
+
+    jcharArray jChars = NULL;
+    jchar key = (jchar) XKeycodeToKeysym(display, event->keycode, 0);
+
+    g_print("KEY %c\n", key);
+
+    if (key >= 'a' && key <= 'z' && (event->state & ControlMask)) {
+        key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
+    }
+
+    if (key > 0) {
+        jChars = mainEnv->NewCharArray(1);
+        if (jChars) {
+            mainEnv->SetCharArrayRegion(jChars, 0, 1, &key);
+            CHECK_JNI_EXCEPTION(mainEnv)
+        }
+    } else {
+        jChars = mainEnv->NewCharArray(0);
+    }
+    if (jview) {
+        if (press) {
+            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+                    com_sun_glass_events_KeyEvent_PRESS,
+                    glassKey,
+                    jChars,
+                    glassModifier);
+            CHECK_JNI_EXCEPTION(mainEnv)
+
+            if (jview && key > 0) { // TYPED events should only be sent for printable characters.
+                mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+                        com_sun_glass_events_KeyEvent_TYPED,
+                        com_sun_glass_events_KeyEvent_VK_UNDEFINED,
+                        jChars,
+                        glassModifier);
+                CHECK_JNI_EXCEPTION(mainEnv)
+            }
+        } else {
+            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+                    com_sun_glass_events_KeyEvent_RELEASE,
+                    glassKey,
+                    jChars,
+                    glassModifier);
+            CHECK_JNI_EXCEPTION(mainEnv)
+        }
+    }
 }
 
 void WindowContextBase::paint(void* data, jint width, jint height) {

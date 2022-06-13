@@ -228,6 +228,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                 case KeyPress:
                 case KeyRelease:
 //                    g_print("X11 Key\n");
+                    ctx->process_key(&xevent.xkey);
                     break;
                 case ButtonPress:
                 case ButtonRelease:
