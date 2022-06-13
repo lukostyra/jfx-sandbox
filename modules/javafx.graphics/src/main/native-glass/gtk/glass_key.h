@@ -26,11 +26,13 @@
 #define        GLASS_KEY_H
 
 #include <jni.h>
+#include <glib.h>
+#include <X11/Xlib.h>
 
-#include <gtk/gtk.h>
+extern bool xkbAvailable;
 
 jint gdk_keyval_to_glass(guint keyval);
-jint get_glass_key(GdkEventKey* e);
+jint get_glass_key(XKeyEvent* e);
 jint glass_key_to_modifier(jint glassKey);
 jint xlib_modifier_mask_to_glass(guint mask);
 gint find_gdk_keyval_for_glass_keycode(jint code);

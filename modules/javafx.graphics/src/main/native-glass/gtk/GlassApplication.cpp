@@ -44,6 +44,7 @@
 #include "glass_general.h"
 #include "glass_evloop.h"
 #include "glass_dnd.h"
+#include "glass_key.h"
 #include "glass_window.h"
 #include "glass_screen.h"
 #include "xsettings-client.h"
@@ -305,6 +306,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
         xkb_minor = XkbMinorVersion;
 
         if (XkbQueryExtension(display, NULL, &xsrc->xkb_event_type, NULL, &major, &minor)) {
+            xkbAvailable = true;
             Bool detectable_autorepeat_supported;
 
             XkbSelectEvents(display,

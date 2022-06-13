@@ -28,8 +28,10 @@
 
 #include <glib.h>
 #include "glass_general.h"
-#include <gdk/gdkkeysyms.h>
+#include <X11/Xlib.h>
 #include <X11/XKBlib.h>
+
+bool xkbAvailable = false;
 
 static gboolean key_initialized = FALSE;
 static GHashTable *keymap;
@@ -239,32 +241,34 @@ jint gdk_keyval_to_glass(guint keyval)
     return GPOINTER_TO_INT(g_hash_table_lookup(keymap, GINT_TO_POINTER(keyval)));
 }
 
-jint get_glass_key(GdkEventKey* e) {
+jint get_glass_key(XKeyEvent* e) {
     init_keymap();
 
-    guint keyValue;
-    guint state = e->state & GDK_MOD2_MASK; //NumLock test
+    KeySym keysym;
+    guint state = e->state & Mod2Mask; //NumLock test
 
-    gdk_keymap_translate_keyboard_state(gdk_keymap_get_default(),
-            e->hardware_keycode, static_cast<GdkModifierType>(state), e->group,
-            &keyValue, NULL, NULL, NULL);
+    XkbDescPtr xkb = XkbGetMap(X_CURRENT_DISPLAY, XkbKeySymsMask | XkbKeyTypesMask | XkbModifierMapMask | XkbVirtualModsMask, XkbUseCoreKbd);
 
-    jint key = GPOINTER_TO_INT(g_hash_table_lookup(keymap,
-            GINT_TO_POINTER(keyValue)));
+    XkbTranslateKeyCode(xkb, e->keycode, state, NULL, &keysym);
+//    gdk_keymap_translate_keyboard_state(gdk_keymap_get_default(),
+//            e->hardware_keycode, static_cast<GdkModifierType>(state), e->group,
+//            &keyValue, NULL, NULL, NULL);
 
-    if (!key) {
-        // We failed to find a keyval in our keymap, this may happen with
-        // non-latin layouts(e.g. Cyrillic). So here we try to find a keyval
-        // from a default layout(we assume that it is a US-like one).
-        GdkKeymapKey kk;
-        kk.keycode = e->hardware_keycode;
-        kk.group = kk.level = 0;
+    jint key = GPOINTER_TO_INT(g_hash_table_lookup(keymap, GINT_TO_POINTER(keysym)));
 
-        keyValue = gdk_keymap_lookup_key(gdk_keymap_get_default(), &kk);
-
-        key = GPOINTER_TO_INT(g_hash_table_lookup(keymap,
-                GINT_TO_POINTER(keyValue)));
-    }
+//    if (!key) {
+//        // We failed to find a keyval in our keymap, this may happen with
+//        // non-latin layouts(e.g. Cyrillic). So here we try to find a keyval
+//        // from a default layout(we assume that it is a US-like one).
+//        GdkKeymapKey kk;
+//        kk.keycode = e->hardware_keycode;
+//        kk.group = kk.level = 0;
+//
+//        keyValue = gdk_keymap_lookup_key(gdk_keymap_get_default(), &kk);
+//
+//        key = GPOINTER_TO_INT(g_hash_table_lookup(keymap,
+//                GINT_TO_POINTER(keyValue)));
+//    }
 
     return key;
 }
@@ -329,41 +333,30 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1getKeyCodeForC
     (void)env;
     (void)jApplication;
 
-    gunichar *ucs_char = g_utf16_to_ucs4(&character, 1, NULL, NULL, NULL);
-    if (ucs_char == NULL) {
+//    gunichar *ucs_char = g_utf16_to_ucs4(&character, 1, NULL, NULL, NULL);
+//    if (ucs_char == NULL) {
+//        return com_sun_glass_events_KeyEvent_VK_UNDEFINED;
+//    }
+
+
+    //TODO: too simple to be correct
+    KeyCode kcode = XKeysymToKeycode(X_CURRENT_DISPLAY, XStringToKeysym((char *) &character));
+
+    if (kcode == 0) {
         return com_sun_glass_events_KeyEvent_VK_UNDEFINED;
     }
-
-    guint keyval = gdk_unicode_to_keyval(*ucs_char);
-
-    if (keyval == (*ucs_char | 0x01000000)) {
-        g_free(ucs_char);
-        return com_sun_glass_events_KeyEvent_VK_UNDEFINED;
-    }
-
-    g_free(ucs_char);
-
-    return gdk_keyval_to_glass(keyval);
+//    guint keyval = gdk_unicode_to_keyval(*ucs_char);
+//
+//    if (keyval == (*ucs_char | 0x01000000)) {
+//        g_free(ucs_char);
+//        return com_sun_glass_events_KeyEvent_VK_UNDEFINED;
+//    }
+//
+//    g_free(ucs_char);
+//
+    return gdk_keyval_to_glass(kcode);
 }
 
-/*
- * Function to determine whether the Xkb extention is available. This is a
- * precaution against X protocol errors, although it should be available on all
- * Linux systems.
- */
-
-static Bool xkbInitialized = False;
-static Bool xkbAvailable = False;
-
-static Bool isXkbAvailable(Display *display) {
-    if (!xkbInitialized) {
-        int xkbMajor = XkbMajorVersion;
-        int xkbMinor = XkbMinorVersion;
-        xkbAvailable = XkbQueryExtension(display, NULL, NULL, NULL, &xkbMajor, &xkbMinor);
-        xkbInitialized = True;
-    }
-    return xkbAvailable;
-}
 
 /*
  * Class:     com_sun_glass_ui_gtk_GtkApplication
@@ -373,11 +366,11 @@ static Bool isXkbAvailable(Display *display) {
 JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1isKeyLocked
   (JNIEnv * env, jobject obj, jint keyCode)
 {
-    Display* display = X_CURRENT_DISPLAY;
-    if (!isXkbAvailable(display)) {
+    if (!xkbAvailable) {
         return com_sun_glass_events_KeyEvent_KEY_LOCK_UNKNOWN;
     }
 
+    Display *display = X_CURRENT_DISPLAY;
     Atom keyCodeAtom = None;
     switch (keyCode) {
         case com_sun_glass_events_KeyEvent_VK_CAPS_LOCK:

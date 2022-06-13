@@ -406,7 +406,8 @@ void WindowContextBase::process_mouse_cross(XCrossingEvent* event) {
 }
 
 void WindowContextBase::process_key(XKeyEvent* event) {
-//    bool press = event->type == GDK_KEY_PRESS;
+    bool press = event->type == KeyPress;
+
 //    jint glassKey = get_glass_key(event);
 //    jint glassModifier = gdk_modifier_mask_to_glass(event->state);
 //    if (press) {

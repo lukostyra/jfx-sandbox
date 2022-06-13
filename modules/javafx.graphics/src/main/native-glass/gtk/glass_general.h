@@ -61,7 +61,7 @@ extern int X_CONTEXT;
 extern JNIEnv* mainEnv; // Use only with main loop thread!!!
 extern JavaVM* javaVM;
 
-#define GLASS_GDK_KEY_CONSTANT(key) (GDK_KEY_ ## key)
+#define GLASS_GDK_KEY_CONSTANT(key) (XK_ ## key)
 
 #include <exception>
 
