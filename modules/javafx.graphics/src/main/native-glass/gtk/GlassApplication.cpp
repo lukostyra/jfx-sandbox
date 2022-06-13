@@ -182,7 +182,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
         }
 
         if (XFindContext(display, xevent.xany.window, X_CONTEXT, (XPointer *) &ctx) != 0) {
-            g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
+            //g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
             continue;
         }
 

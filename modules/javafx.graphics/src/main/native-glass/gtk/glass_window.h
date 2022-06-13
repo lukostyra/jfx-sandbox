@@ -211,8 +211,7 @@ protected:
     Window xwindow;
     Window xparent;
     Display* display;
-    Visual* visual;
-    unsigned int depth;
+    XVisualInfo vinfo;
 
     int visibility_state;
     bool is_iconified;

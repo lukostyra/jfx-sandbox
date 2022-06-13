@@ -475,7 +475,7 @@ void WindowContextBase::process_key(XKeyEvent* event) {
 
 void WindowContextBase::paint(void* data, jint width, jint height) {
     cairo_surface_t* x11_surface;
-    x11_surface = cairo_xlib_surface_create(display, xwindow, visual, width, height);
+    x11_surface = cairo_xlib_surface_create(display, xwindow, vinfo.visual, width, height);
     cairo_surface_t* img_surface;
     img_surface = cairo_image_surface_create_for_data((unsigned char*)data,
                                                        CAIRO_FORMAT_ARGB32,
@@ -695,39 +695,48 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                | PropertyChangeMask;
 
     display = X_CURRENT_DISPLAY;
-    visual = DefaultVisual(display, DefaultScreen(display));
     glong xvisualID = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
 
-    XVisualInfo* vinfo;
-    XVisualInfo vinfo_template;
-    depth = DefaultDepth(display, DefaultScreen(display));
-    int visual_info_n = 0;
+    g_print("VisualID: %ld\n", xvisualID);
+    bool matched = false;
     if (xvisualID != 0) {
-        vinfo_template.visualid = xvisualID;
-        vinfo = XGetVisualInfo(display, VisualIDMask, &vinfo_template, &visual_info_n);
+        int nitems_return;
+        XVisualInfo to_match;
+        to_match.visualid = xvisualID;
 
-        if (visual_info_n > 0) {
-            visual = vinfo[0].visual;
-            depth = vinfo[0].depth;
+        //we try to match
+        XVisualInfo *temp_info = XGetVisualInfo(display, VisualIDMask, &to_match, &nitems_return);
+
+        if (nitems_return > 0) {
+            vinfo = temp_info[0];
+            matched = true;
         }
-//        XFree(vinfo);
+
+        XFree(temp_info);
+    }
+
+    if (!matched) {
+        g_print("DEPTH: %d\n", depth);
+        XMatchVisualInfo(display, DefaultScreen(display), 32, TrueColor, &vinfo);
+        //TODO: may not match
     }
 
     XSetWindowAttributes attr;
-    attr.colormap = XCreateColormap(display, DefaultRootWindow(display), visual, AllocNone);
-//    attr.border_pixel = 0;
+    attr.colormap = XCreateColormap(display, DefaultRootWindow(display), vinfo.visual, AllocNone);
+    attr.border_pixel = 0;
     attr.background_pixel = (frame_type == TRANSPARENT)
-                                ? 0x00000000
+                                ? 0
                                 : WhitePixel(display, DefaultScreen(display));
+
     attr.override_redirect = (type == POPUP) ? True : False;
     attr.win_gravity = NorthWestGravity;
     attr.event_mask = mask;
 
     xparent = (owner) ? owner->get_window_xid() : DefaultRootWindow(display);
-    xwindow = XCreateWindow(display, xparent, 0, 0,
-                            1, 1, 0, depth, InputOutput, visual,
+    xwindow = XCreateWindow(display, xparent, 0, 0, 1, 1, 0,
+                            vinfo.depth, InputOutput, vinfo.visual,
                             CWEventMask  | CWOverrideRedirect | CWBitGravity |
-                            CWColormap | CWBackPixel, &attr);
+                            CWColormap | CWBackPixel | CWBorderPixel, &attr);
 
     if (XSaveContext(display, xwindow, X_CONTEXT, XPointer(this)) != 0) {
         g_print("Fail to save context\n");
