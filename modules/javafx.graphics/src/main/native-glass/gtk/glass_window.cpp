@@ -723,8 +723,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     attr.win_gravity = NorthWestGravity;
     attr.event_mask = mask;
 
-    //TODO: child windows
-    xparent = DefaultRootWindow(display);
+    xparent = (owner) ? owner->get_window_xid() : DefaultRootWindow(display);
     xwindow = XCreateWindow(display, xparent, 0, 0,
                             1, 1, 0, depth, InputOutput, visual,
                             CWEventMask  | CWOverrideRedirect | CWBitGravity |
@@ -780,7 +779,8 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     }
 
     if (owner) {
-//        owner->add_child(this);
+        owner->add_child(this);
+
 //        if (on_top_inherited()) {
 //            gtk_window_set_keep_above(GTK_WINDOW(gtk_widget), TRUE);
 //        }
@@ -1301,7 +1301,26 @@ void WindowContextTop::set_title(const char* title) {
 }
 
 void WindowContextTop::set_alpha(double alpha) {
-//    /gtk_window_set_opacity(GTK_WINDOW(gtk_widget), (gdouble)alpha);
+    double target_opacity;
+    gulong cardinal;
+
+    if (alpha > 1) {
+        target_opacity = 1;
+    } else if (alpha < 0) {
+        target_opacity = 0;
+    } else {
+        target_opacity = alpha;
+    }
+
+    g_print("=========> Set Alpha %f\n", alpha);
+    cardinal = target_opacity * 0xffffffff;
+
+    if (cardinal == 0xffffffff) {
+        XDeleteProperty(display, xwindow, XInternAtom(display, "_NET_WM_WINDOW_OPACITY", True));
+    } else {
+        XChangeProperty(display, xwindow, XInternAtom(display, "_NET_WM_WINDOW_OPACITY", True),
+                        XA_CARDINAL, 32, PropModeReplace, (guchar *) &cardinal, 1);
+    }
 }
 
 void WindowContextTop::set_enabled(bool enabled) {
