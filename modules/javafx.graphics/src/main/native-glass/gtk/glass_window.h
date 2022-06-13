@@ -366,9 +366,6 @@ private:
 //    void request_frame_extents();
     void window_configure(XWindowChanges *, unsigned int);
     void update_window_constraints();
-    void update_ontop_tree(bool);
-    bool on_top_inherited();
-    bool effective_on_top();
     WindowContextTop(WindowContextTop&);
     WindowContextTop& operator= (const WindowContextTop&);
 };
