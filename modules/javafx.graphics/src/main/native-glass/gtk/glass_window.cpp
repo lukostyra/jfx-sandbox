@@ -417,23 +417,28 @@ void WindowContextBase::process_key(XKeyEvent* event) {
     }
 
     jcharArray jChars = NULL;
-    jchar key = (jchar) XKeycodeToKeysym(display, event->keycode, 0);
+    jchar key = 0;
 
-    g_print("KEY %c\n", key);
+    KeySym keysym = XLookupKeysym(event, 0);
 
-    if (key >= 'a' && key <= 'z' && (event->state & ControlMask)) {
-        key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
-    }
+    if (keysym != NoSymbol) {
+        key = (jchar) keysym;
 
-    if (key > 0) {
-        jChars = mainEnv->NewCharArray(1);
-        if (jChars) {
-            mainEnv->SetCharArrayRegion(jChars, 0, 1, &key);
-            CHECK_JNI_EXCEPTION(mainEnv)
+        if (key >= 'a' && key <= 'z' && (event->state & ControlMask)) {
+            key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
         }
-    } else {
-        jChars = mainEnv->NewCharArray(0);
+
+        if (key > 0) {
+            jChars = mainEnv->NewCharArray(1);
+            if (jChars) {
+                mainEnv->SetCharArrayRegion(jChars, 0, 1, &key);
+                CHECK_JNI_EXCEPTION(mainEnv)
+            }
+        } else {
+            jChars = mainEnv->NewCharArray(0);
+        }
     }
+
     if (jview) {
         if (press) {
             mainEnv->CallVoidMethod(jview, jViewNotifyKey,
