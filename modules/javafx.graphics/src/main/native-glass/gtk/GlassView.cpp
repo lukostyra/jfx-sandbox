@@ -48,14 +48,14 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkView_enableInputMethodEvents
     (void)env;
     (void)obj;
 
-//    GlassView* view = JLONG_TO_GLASSVIEW(ptr);
-//    if (view->current_window) {
-//        if (enable) {
-//            view->current_window->enableOrResetIME();
-//        } else {
-//            view->current_window->disableIME();
-//        }
-//    }
+    GlassView* view = JLONG_TO_GLASSVIEW(ptr);
+    if (view->current_window) {
+        if (enable) {
+            view->current_window->enableOrResetIME();
+        } else {
+            view->current_window->disableIME();
+        }
+    }
 }
 
 /*

@@ -123,10 +123,10 @@ class WindowContextTop;
 class WindowContext {
 public:
     virtual bool isEnabled() = 0;
-//    virtual bool hasIME() = 0;
-//    virtual bool filterIME(GdkEvent *) = 0;
-//    virtual void enableOrResetIME() = 0;
-//    virtual void disableIME() = 0;
+    virtual bool hasIME() = 0;
+    virtual bool filterIME(XEvent *) = 0;
+    virtual void enableOrResetIME() = 0;
+    virtual void disableIME() = 0;
     virtual void paint(void* data, jint width, jint height) = 0;
     virtual WindowFrameExtents get_frame_extents() = 0;
 
@@ -238,10 +238,10 @@ protected:
     static WindowContext* sm_mouse_drag_window;
 public:
     bool isEnabled();
-//    bool hasIME();
-//    bool filterIME(GdkEvent *);
-//    void enableOrResetIME();
-//    void disableIME();
+    bool hasIME();
+    bool filterIME(XEvent *);
+    void enableOrResetIME();
+    void disableIME();
     void paint(void*, jint, jint);
     XID get_window_xid();
     jobject get_jwindow();
@@ -284,8 +284,8 @@ public:
     ~WindowContextBase();
 protected:
     virtual void applyShapeMask(void*, uint width, uint height) = 0;
-//private:
-//    bool im_filter_keypress(GdkEventKey*);
+private:
+    bool im_filter_keypress(XKeyEvent*);
 };
 
 class WindowContextTop: public WindowContextBase {

@@ -187,9 +187,9 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             continue;
         }
 
-//        if (ctx->hasIME() && ctx->filterIME(event)) {
-//            continue;
-//        }
+        if (ctx->hasIME() && ctx->filterIME(&xevent)) {
+            continue;
+        }
 
         EventsCounterHelper helper(ctx);
         try {
