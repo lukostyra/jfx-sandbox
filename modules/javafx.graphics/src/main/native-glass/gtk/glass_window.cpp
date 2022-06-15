@@ -679,26 +679,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
             requested_bounds() {
     jwindow = mainEnv->NewGlobalRef(_jwindow);
 
-    int mask = KeyPressMask
-               | KeyReleaseMask
-               | ButtonPressMask
-               | ButtonReleaseMask
-               | EnterWindowMask
-               | LeaveWindowMask
-               | PointerMotionMask
-               | Button1MotionMask
-               | Button2MotionMask
-               | Button3MotionMask
-               //Mouse Wheel
-               | Button4MotionMask
-               | Button5MotionMask
-               | ButtonMotionMask
-               | ExposureMask
-               | VisibilityChangeMask
-               | StructureNotifyMask
-               | SubstructureNotifyMask
-               | FocusChangeMask
-               | PropertyChangeMask;
 
     display = X_CURRENT_DISPLAY;
     glong xvisualID = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
@@ -735,7 +715,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
     attr.override_redirect = (type == POPUP) ? True : False;
     attr.win_gravity = NorthWestGravity;
-    attr.event_mask = mask;
+    attr.event_mask = WINDOW_EVENT_MASK;
 
     xparent = (owner) ? owner->get_window_xid() : DefaultRootWindow(display);
     xwindow = XCreateWindow(display, xparent, 0, 0, 1, 1, 0,
@@ -754,8 +734,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
     XSetWMProtocols(display, xwindow, protocols, 3);
     g_print("X WINDOW ID = %ld\n", xwindow);
-
-    //TODO: set _NET_WM_PID
 
     Atom type_atom;
     switch (type) {
@@ -794,10 +772,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 
     if (owner) {
         owner->add_child(this);
-
-//        if (on_top_inherited()) {
-//            gtk_window_set_keep_above(GTK_WINDOW(gtk_widget), TRUE);
-//        }
     }
 
     MwmHints hints;

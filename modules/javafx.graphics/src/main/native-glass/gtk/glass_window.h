@@ -51,7 +51,6 @@
 #define MWM_HINTS_INPUT_MODE    (1L << 2)
 #define MWM_HINTS_STATUS        (1L << 3)
 
-
 enum WindowFrameType {
     TITLED,
     UNTITLED,
@@ -79,7 +78,28 @@ struct WindowFrameExtents {
     int right;
 };
 
-static const guint MOUSE_BUTTONS_MASK = (guint) (Button1Mask | Button2Mask | Button3Mask);
+static const int MOUSE_BUTTONS_MASK = Button1Mask | Button2Mask | Button3Mask;
+
+static const int WINDOW_EVENT_MASK = KeyPressMask
+                                   | KeyReleaseMask
+                                   | ButtonPressMask
+                                   | ButtonReleaseMask
+                                   | EnterWindowMask
+                                   | LeaveWindowMask
+                                   | PointerMotionMask
+                                   | Button1MotionMask
+                                   | Button2MotionMask
+                                   | Button3MotionMask
+                                   //Mouse Wheel
+                                   | Button4MotionMask
+                                   | Button5MotionMask
+                                   | ButtonMotionMask
+                                   | ExposureMask
+                                   | VisibilityChangeMask
+                                   | StructureNotifyMask
+                                   | SubstructureNotifyMask
+                                   | FocusChangeMask
+                                   | PropertyChangeMask;
 
 enum BoundsType {
     BOUNDSTYPE_CONTENT,
