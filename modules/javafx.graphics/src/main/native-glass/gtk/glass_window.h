@@ -302,8 +302,6 @@ public:
     bool is_dead();
 
     ~WindowContextBase();
-protected:
-    virtual void applyShapeMask(void*, uint width, uint height) = 0;
 private:
     bool im_filter_keypress(XKeyEvent*);
 };
@@ -377,8 +375,6 @@ public:
     void set_owner(WindowContext*);
 
     void detach_from_java();
-protected:
-    void applyShapeMask(void*, uint width, uint height);
 private:
     bool get_frame_extents_property(int *, int *, int *, int *);
     void activate_window();

@@ -683,6 +683,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     display = X_CURRENT_DISPLAY;
     glong xvisualID = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
 
+    g_print("SCREEN %ld\n", screen);
     g_print("VisualID: %ld\n", xvisualID);
     bool matched = false;
     if (xvisualID != 0) {
@@ -702,7 +703,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     }
 
     if (!matched) {
-        XMatchVisualInfo(display, DefaultScreen(display), 32, TrueColor, &vinfo);
+        XMatchVisualInfo(display, screen, 32, TrueColor, &vinfo);
         //TODO: may not match
     }
 
@@ -711,7 +712,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     attr.border_pixel = 0;
     attr.background_pixel = (frame_type == TRANSPARENT)
                                 ? 0
-                                : WhitePixel(display, DefaultScreen(display));
+                                : WhitePixel(display, screen);
 
     attr.override_redirect = (type == POPUP) ? True : False;
     attr.win_gravity = NorthWestGravity;
@@ -730,7 +731,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     Atom protocols[3] = { XInternAtom(display, "WM_DELETE_WINDOW", True),
                           XInternAtom(display, "WM_TAKE_FOCUS", True),
                           XInternAtom(display, "_NET_WM_PING", True) };
-//                          XInternAtom(display, "_NET_WM_SYNC_REQUEST", True) };
+                                                                                                                                                                        //                          XInternAtom(display, "_NET_WM_SYNC_REQUEST", True) };
 
     XSetWMProtocols(display, xwindow, protocols, 3);
     g_print("X WINDOW ID = %ld\n", xwindow);
@@ -1207,20 +1208,15 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
     XFlush(display);
 }
 
-void WindowContextTop::applyShapeMask(void* data, uint width, uint height)
-{
-    if (frame_type != TRANSPARENT) {
-        return;
-    }
-
-//    glass_window_apply_shape_mask(gtk_widget_get_window(gtk_widget), data, width, height);
-}
-
 void WindowContextTop::set_minimized(bool minimize) {
     is_iconified = minimize;
 
-    change_wm_state(minimize,
-                    XInternAtom(display, "_NET_WM_STATE_HIDDEN", True), None);
+    if (map_received) {
+        XIconifyWindow(display, xwindow, screen);
+    } else {
+        change_wm_state(minimize,
+                        XInternAtom(display, "_NET_WM_STATE_HIDDEN", True), None);
+    }
 }
 
 void WindowContextTop::set_maximized(bool maximize) {
@@ -1250,23 +1246,15 @@ void WindowContextTop::change_wm_state(bool add, Atom state1, Atom state2) {
 }
 
 void WindowContextTop::enter_fullscreen() {
-    //FIXME: may have to set this if unmapped
-//    Atom atoms[1];
-//    atoms[0] = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", true);
-//
-//    XChangeProperty(display, xwindow, XInternAtom(display, "_NET_WM_STATE", true),
-//                    XA_WINDOW, 32, PropModeReplace, (unsigned char *) atoms, 1);
     change_wm_state(true, XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", True), None);
 }
 
 void WindowContextTop::exit_fullscreen() {
     change_wm_state(false, XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", True), None);
-//    XDeleteProperty(display, xwindow, XInternAtom(display, "_NET_WM_STATE", true));
 }
 
 void WindowContextTop::request_focus() {
 //    XRaiseWindow(display, xwindow);
-//RevertToParent, RevertToPointerRoot, or RevertToNone
     XSetInputFocus(display, xwindow, RevertToParent, CurrentTime);
 }
 
@@ -1285,7 +1273,7 @@ void WindowContextTop::set_title(const char* title) {
     XChangeProperty(display, xwindow,
                    XInternAtom(display, "_NET_WM_NAME", true),
                    XInternAtom(display, "UTF8_STRING", true), 8,
-                   PropModeReplace, (unsigned char*) title, strlen (title));
+                   PropModeReplace, (unsigned char*) title, strlen(title));
 }
 
 void WindowContextTop::set_alpha(double alpha) {
