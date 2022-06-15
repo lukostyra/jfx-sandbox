@@ -36,10 +36,10 @@ static Cursor get_empty_cursor() {
     if (emptyCursor == 0) {
         XColor color;
         char data[1];
-        Pixmap pixmap = XCreateBitmapFromData(X_CURRENT_DISPLAY, DefaultRootWindow(X_CURRENT_DISPLAY), data, 1, 1);
-        emptyCursor = XCreatePixmapCursor(X_CURRENT_DISPLAY, pixmap, pixmap, &color, &color, 0, 0);
+        Pixmap pixmap = XCreateBitmapFromData(main_ctx->display, DefaultRootWindow(main_ctx->display), data, 1, 1);
+        emptyCursor = XCreatePixmapCursor(main_ctx->display, pixmap, pixmap, &color, &color, 0, 0);
 
-        XFreePixmap(X_CURRENT_DISPLAY, pixmap);
+        XFreePixmap(main_ctx->display, pixmap);
     }
 
     return emptyCursor;
@@ -50,60 +50,60 @@ Cursor get_native_cursor(int type) {
     Cursor cursor;
     switch (type) {
         case com_sun_glass_ui_Cursor_CURSOR_TEXT:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "text");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "text");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_CROSSHAIR:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "crosshair");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "crosshair");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_CLOSED_HAND:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "grabbing");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "grabbing");
             if (cursor == 0) {
-                cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "fleur");
+                cursor = XcursorLibraryLoadCursor(main_ctx->display, "fleur");
             }
             break;
             case com_sun_glass_ui_Cursor_CURSOR_OPEN_HAND:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "hand1");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "hand1");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_POINTING_HAND:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "pointer");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "pointer");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_UP:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "n-resize");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "n-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_DOWN:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "s-resize");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "s-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_UPDOWN:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "ns-resize");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "ns-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_LEFT:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "w-resize");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "w-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_RIGHT:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "e-resize");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "e-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_LEFTRIGHT:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "ew-resize");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "ew-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_SOUTHWEST:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "sw-resize");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "sw-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_NORTHEAST:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "ne-resize");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "ne-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_SOUTHEAST:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "se-resize");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "se-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_RESIZE_NORTHWEST:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "nw-resize");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "nw-resize");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_MOVE:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "move");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "move");
             break;
         case com_sun_glass_ui_Cursor_CURSOR_WAIT:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "watch");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "watch");
             if (cursor == 0) {
-                cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "progress");
+                cursor = XcursorLibraryLoadCursor(main_ctx->display, "progress");
             }
             break;
         case com_sun_glass_ui_Cursor_CURSOR_DISAPPEAR:
@@ -112,7 +112,7 @@ Cursor get_native_cursor(int type) {
             break;
         case com_sun_glass_ui_Cursor_CURSOR_DEFAULT:
         default:
-            cursor = XcursorLibraryLoadCursor(X_CURRENT_DISPLAY, "default");
+            cursor = XcursorLibraryLoadCursor(main_ctx->display, "default");
             break;
     }
 
@@ -146,7 +146,7 @@ JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkCursor__1createCursor
         xcimage->yhot = y;
         xcimage->pixels = (XcursorPixel *) cairo_image_surface_get_data(src_image);
 
-        cursor = XcursorImageLoadCursor(X_CURRENT_DISPLAY, xcimage);
+        cursor = XcursorImageLoadCursor(main_ctx->display, xcimage);
         g_print("Created Cursor: %ld\n", cursor);
         XcursorImageDestroy(xcimage);
     }
@@ -168,7 +168,7 @@ JNIEXPORT jobject JNICALL Java_com_sun_glass_ui_gtk_GtkCursor__1getBestSize
     (void)width;
     (void)height;
 
-    int size = XcursorGetDefaultSize(X_CURRENT_DISPLAY);
+    int size = XcursorGetDefaultSize(main_ctx->display);
 
     jclass jc = env->FindClass("com/sun/glass/ui/Size");
     if (env->ExceptionCheck()) return NULL;

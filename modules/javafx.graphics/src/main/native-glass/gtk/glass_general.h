@@ -35,6 +35,7 @@
 #include <X11/Xresource.h>
 
 #include "wrapped.h"
+#include "xsettings-client.h"
 
 #if GTK_CHECK_VERSION(3, 0, 0)
 #if ! GTK_CHECK_VERSION(3, 8, 0)
@@ -127,7 +128,18 @@ private:
         int flag;
     } RunnableContext;
 
-    extern Display * X_CURRENT_DISPLAY;
+    typedef struct  {
+        GSource source;
+        GPollFD dpy_pollfd;
+        Display *display;
+        int randr_event_base;
+        int xsync_event_base;
+        int xdamage_event_base;
+        int xkb_event_type;
+        XSettingsClient *settings_client;
+    } MainContext;
+
+    extern MainContext * main_ctx;
     extern char const * const GDK_WINDOW_DATA_CONTEXT;
 
     Cursor get_native_cursor(int type);

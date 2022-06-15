@@ -34,7 +34,7 @@ jfloat OverrideUIScale = -1.0f;
 int DEFAULT_DPI = 96;
 
 static guint get_current_desktop(Screen *screen) {
-    Atom currentDesktopAtom = XInternAtom(X_CURRENT_DISPLAY, "_NET_CURRENT_DESKTOP", True);
+    Atom currentDesktopAtom = XInternAtom(main_ctx->display, "_NET_CURRENT_DESKTOP", True);
     guint ret = 0;
 
     Atom type;
@@ -46,7 +46,7 @@ static guint get_current_desktop(Screen *screen) {
         return 0;
     }
 
-    int result = XGetWindowProperty(X_CURRENT_DISPLAY,
+    int result = XGetWindowProperty(main_ctx->display,
                                     RootWindowOfScreen(screen),
                                     currentDesktopAtom, 0, G_MAXLONG, False, XA_CARDINAL,
                                     &type, &format, &num, &left, (unsigned char **)&data);
@@ -67,7 +67,7 @@ static XRectangle get_screen_workarea(Screen *screen) {
     XRectangle ret = { 0, 0, WidthOfScreen(screen), HeightOfScreen(screen) };
 
     //TODO: Window manager might not support _NET_WORKAREA
-    Atom workareaAtom = XInternAtom(X_CURRENT_DISPLAY, "_NET_WORKAREA", True);
+    Atom workareaAtom = XInternAtom(main_ctx->display, "_NET_WORKAREA", True);
 
     Atom type;
     int format;
@@ -78,7 +78,7 @@ static XRectangle get_screen_workarea(Screen *screen) {
         return ret;
     }
 
-    int result = XGetWindowProperty(X_CURRENT_DISPLAY,
+    int result = XGetWindowProperty(main_ctx->display,
                                     RootWindowOfScreen(screen),
                                     workareaAtom, 0, G_MAXLONG, False, AnyPropertyType,
                                     &type, &format, &num, &left, (unsigned char **)&data);
@@ -131,7 +131,7 @@ static jobject createJavaScreen(JNIEnv* env, Screen* screen) {
     g_print("Work Area: x:%d, y:%d, w:%d, h:%d\n", workArea.x, workArea.y, workArea.width, workArea.height);
 
     XWindowAttributes rootwin_geometry;
-    XGetWindowAttributes(X_CURRENT_DISPLAY, RootWindowOfScreen(screen), &rootwin_geometry);
+    XGetWindowAttributes(main_ctx->display, RootWindowOfScreen(screen), &rootwin_geometry);
 
 //    LOG1("convert monitor[%d] -> glass Screen\n", monitor_idx)
     LOG4("[x: %d y: %d w: %d h: %d]\n",
@@ -187,7 +187,7 @@ static jobject createJavaScreen(JNIEnv* env, Screen* screen) {
 }
 
 jobject createJavaScreen(JNIEnv* env, int monitor_idx) {
-    Screen* default_screen = ScreenOfDisplay(X_CURRENT_DISPLAY, monitor_idx);
+    Screen* default_screen = ScreenOfDisplay(main_ctx->display, monitor_idx);
 
     try {
         return createJavaScreen(env, default_screen);
@@ -197,7 +197,7 @@ jobject createJavaScreen(JNIEnv* env, int monitor_idx) {
 }
 
 jobjectArray rebuild_screens(JNIEnv* env) {
-    int n_monitors = ScreenCount(X_CURRENT_DISPLAY);
+    int n_monitors = ScreenCount(main_ctx->display);
 
     jobjectArray jscreens = env->NewObjectArray(n_monitors, jScreenCls, NULL);
     JNI_EXCEPTION_TO_CPP(env)
@@ -205,7 +205,7 @@ jobjectArray rebuild_screens(JNIEnv* env) {
 
     int i;
     for (i=0; i < n_monitors; i++) {
-        env->SetObjectArrayElement(jscreens, i, createJavaScreen(env, ScreenOfDisplay(X_CURRENT_DISPLAY, i)));
+        env->SetObjectArrayElement(jscreens, i, createJavaScreen(env, ScreenOfDisplay(main_ctx->display, i)));
         JNI_EXCEPTION_TO_CPP(env)
     }
 

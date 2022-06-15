@@ -28,7 +28,7 @@
 #include <gtk/gtk.h>
 
 char const * const GDK_WINDOW_DATA_CONTEXT = "glass_window_context";
-Display * X_CURRENT_DISPLAY;
+MainContext* main_ctx = NULL;
 
 int X_CONTEXT = XUniqueContext();
 jclass jStringCls;

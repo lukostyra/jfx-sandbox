@@ -652,7 +652,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     jwindow = mainEnv->NewGlobalRef(_jwindow);
 
 
-    display = X_CURRENT_DISPLAY;
+    display = main_ctx->display;
     glong xvisualID = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
 
     g_print("SCREEN %ld\n", screen);

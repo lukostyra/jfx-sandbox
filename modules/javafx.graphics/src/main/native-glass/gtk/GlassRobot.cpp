@@ -40,7 +40,7 @@
 #define MOUSE_FORWARD_BTN 9
 
 static void getXPointerPos(int *x, int *y) {
-    Display *xdisplay = X_CURRENT_DISPLAY;
+    Display *xdisplay = main_ctx->display;
 
     Window child_win, root_win;
     int win_x, win_y;
@@ -56,7 +56,7 @@ static void checkXTest(JNIEnv* env) {
     static int32_t isXTestAvailable;
     static gboolean checkDone = FALSE;
     if (!checkDone) {
-        Display *xdisplay = X_CURRENT_DISPLAY;
+        Display *xdisplay = main_ctx->display;
 
         /* check if XTest is available */
         isXTestAvailable = XQueryExtension(xdisplay, XTestExtensionName, &major_opcode, &first_event, &first_error);
@@ -81,7 +81,7 @@ static void checkXTest(JNIEnv* env) {
 }
 
 static void keyButton(jint code, gboolean press) {
-    Display *xdisplay = X_CURRENT_DISPLAY;
+    Display *xdisplay = main_ctx->display;
 
     gint gdk_keyval = find_gdk_keyval_for_glass_keycode(code);
     GdkKeymapKey *keys;
@@ -143,7 +143,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mouseMove
 {
     (void)obj;
 
-    Display *xdisplay = X_CURRENT_DISPLAY;
+    Display *xdisplay = main_ctx->display;
 
     checkXTest(env);
     jfloat uiScale = getUIScale(DefaultScreenOfDisplay(xdisplay));
@@ -158,7 +158,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mouseMove
 
 static void mouseButtons(jint buttons, gboolean press)
 {
-    Display *xdisplay = X_CURRENT_DISPLAY;
+    Display *xdisplay = main_ctx->display;
 
     if (buttons & com_sun_glass_ui_GlassRobot_MOUSE_LEFT_BTN) {
         XTestFakeButtonEvent(xdisplay, 1, press, CurrentTime);
@@ -217,7 +217,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1mouseWheel
 {
     (void)obj;
 
-    Display *xdisplay = X_CURRENT_DISPLAY;
+    Display *xdisplay = main_ctx->display;
     int repeat = abs(amt);
     int button = amt < 0 ? 4 : 5;
     int i;
@@ -243,7 +243,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1getMouseX
 
     jint x, y;
     getXPointerPos(&x, &y);
-    x = rint(x / getUIScale(DefaultScreenOfDisplay(X_CURRENT_DISPLAY)));
+    x = rint(x / getUIScale(DefaultScreenOfDisplay(main_ctx->display)));
     return x;
 }
 
@@ -260,7 +260,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkRobot__1getMouseY
 
     jint x, y;
     getXPointerPos(&x, &y);
-    y = rint(y / getUIScale(DefaultScreenOfDisplay(X_CURRENT_DISPLAY)));
+    y = rint(y / getUIScale(DefaultScreenOfDisplay(main_ctx->display)));
     return y;
 }
 

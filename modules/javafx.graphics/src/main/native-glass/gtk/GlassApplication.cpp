@@ -53,7 +53,6 @@ static void process_events(GdkEvent*, gpointer);
 JNIEnv* mainEnv; // Use only with main loop thread!!!
 
 extern gboolean disableGrab;
-static GMainLoop *mainLoop = NULL;
 
 static gboolean call_runnable (gpointer data)
 {
@@ -84,16 +83,6 @@ static gboolean x11_event_source_prepare(GSource* source, gint* timeout);
 static gboolean x11_event_source_check(GSource* source);
 static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback, gpointer user_data);
 
-typedef struct x11_source {
-    GSource source;
-    Display *display;
-    int randr_event_base;
-    int xsync_event_base;
-    int xdamage_event_base;
-    int xkb_event_type;
-    XSettingsClient *settings_client;
-} X11Source;
-
 static GSourceFuncs x11_event_funcs = {
     x11_event_source_prepare,
     x11_event_source_check,
@@ -102,6 +91,8 @@ static GSourceFuncs x11_event_funcs = {
     NULL,
     NULL
 };
+
+static GMainLoop *mainLoop = NULL;
 
 static int DoubleClickTime = -1;
 static int DoubleClickDistance = -1;
@@ -131,15 +122,15 @@ static void setting_notify_cb (const char       *name,
 }
 
 static void x11_monitor_events(GSource* source) {
-    Display *display = ((X11Source *)source)->display;
+    MainContext *m_ctx = ((MainContext *)source);
 
-    GPollFD dpy_pollfd = {
-        XConnectionNumber(display),
+    m_ctx->dpy_pollfd = {
+        XConnectionNumber(m_ctx->display),
         G_IO_IN | G_IO_HUP | G_IO_ERR,
         0
     };
 
-    g_source_add_poll(source, &dpy_pollfd);
+    g_source_add_poll(source, &m_ctx->dpy_pollfd);
 
     g_source_set_priority(source, G_PRIORITY_HIGH_IDLE + 50);
     g_source_set_can_recurse(source, TRUE);
@@ -158,21 +149,20 @@ static gboolean x11_event_source_check(GSource* source) {
 static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback, gpointer data) {
     XEvent xevent;
 
-    X11Source *xsrc = ((X11Source*) source);
-    Display *display = xsrc->display;
+    Display *display = main_ctx->display;
     WindowContext* ctx;
 
     while (XPending(display)) {
         XNextEvent(display, &xevent);
 
-        if (xsettings_client_process_event(xsrc->settings_client, &xevent)) {
+        if (xsettings_client_process_event(main_ctx->settings_client, &xevent)) {
             continue;
         }
 
         if (xevent.xany.window == DefaultRootWindow(display)) {
             g_print("============> Root Window Event %d\n", xevent.type);
 
-            if (xsrc->randr_event_base + RRScreenChangeNotify == xevent.type) {
+            if (main_ctx->randr_event_base + RRScreenChangeNotify == xevent.type) {
                 g_print("============> UPDATE SCREENS %d\n", xevent.type);
                 mainEnv->CallStaticVoidMethod(jScreenCls, jScreenNotifySettingsChanged);
                 LOG_EXCEPTION(mainEnv);
@@ -265,26 +255,24 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
 
     env->ExceptionClear();
 
+    GSource *source = g_source_new(&x11_event_funcs, sizeof(MainContext));
+    main_ctx = ((MainContext *) source);
+
     Display *display = XOpenDisplay(NULL);
-    X_CURRENT_DISPLAY = display;
-
-    GSource *source = g_source_new(&x11_event_funcs, sizeof(X11Source));
-
-    X11Source *xsrc = ((X11Source *) source);
-    xsrc->display = display;
+    main_ctx->display = display;
 
     int major, minor, ignore;
 
     //XrandR
-    if (XRRQueryExtension(display, &xsrc->randr_event_base, &ignore)) {
+    if (XRRQueryExtension(display, &main_ctx->randr_event_base, &ignore)) {
         XRRSelectInput(display, DefaultRootWindow(display), RRScreenChangeNotifyMask);
     }
 
-    if (XSyncQueryExtension(display, &xsrc->xsync_event_base, &ignore)) {
+    if (XSyncQueryExtension(display, &main_ctx->xsync_event_base, &ignore)) {
         XSyncInitialize(display, &major, &minor);
     }
     
-    XDamageQueryExtension(display, &xsrc->xdamage_event_base, &ignore);
+    XDamageQueryExtension(display, &main_ctx->xdamage_event_base, &ignore);
 
     gint xkb_major = XkbMajorVersion;
     gint xkb_minor = XkbMinorVersion;
@@ -293,7 +281,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
         xkb_major = XkbMajorVersion;
         xkb_minor = XkbMinorVersion;
 
-        if (XkbQueryExtension(display, NULL, &xsrc->xkb_event_type, NULL, &major, &minor)) {
+        if (XkbQueryExtension(display, NULL, &main_ctx->xkb_event_type, NULL, &major, &minor)) {
             xkbAvailable = true;
             Bool detectable_autorepeat_supported;
 
@@ -313,8 +301,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
     }
 
     //TODO: can get setting change notification
-    //TODO: xsettings_client_destroy
-    xsrc->settings_client = xsettings_client_new(display, DefaultScreen(display), setting_notify_cb, NULL, NULL);
+    main_ctx->settings_client = xsettings_client_new(display, DefaultScreen(display), setting_notify_cb, NULL, NULL);
 
     x11_monitor_events(source);
 
@@ -402,6 +389,19 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1terminateLoop
     (void)obj;
 
     g_print("terminateLoop\n");
+
+    if (main_ctx) {
+        g_print("g_source_destroy\n");
+        g_source_remove_poll(&main_ctx->source, &main_ctx->dpy_pollfd);
+        g_source_destroy(&main_ctx->source);
+        g_print("xsettings_client_destroy\n");
+        //xsettings_client_destroy(main_ctx->settings_client);
+        g_print("XCloseDisplay\n");
+        XCloseDisplay(main_ctx->display);
+        g_free(main_ctx);
+        main_ctx = NULL;
+    }
+
     g_main_loop_unref(mainLoop);
 }
 
@@ -548,7 +548,7 @@ JNIEXPORT jboolean JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1supportsTr
 
     int ignore;
 
-    return XCompositeQueryExtension(X_CURRENT_DISPLAY, &ignore, &ignore);
+    return XCompositeQueryExtension(main_ctx->display, &ignore, &ignore);
 }
 
 } // extern "C"

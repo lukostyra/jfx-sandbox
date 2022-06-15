@@ -247,7 +247,7 @@ jint get_glass_key(XKeyEvent* e) {
     KeySym keysym;
     guint state = e->state & Mod2Mask; //NumLock test
 
-    XkbDescPtr xkb = XkbGetMap(X_CURRENT_DISPLAY, XkbKeySymsMask | XkbKeyTypesMask | XkbModifierMapMask | XkbVirtualModsMask, XkbUseCoreKbd);
+    XkbDescPtr xkb = XkbGetMap(main_ctx->display, XkbKeySymsMask | XkbKeyTypesMask | XkbModifierMapMask | XkbVirtualModsMask, XkbUseCoreKbd);
 
     XkbTranslateKeyCode(xkb, e->keycode, state, NULL, &keysym);
 //    gdk_keymap_translate_keyboard_state(gdk_keymap_get_default(),
@@ -340,7 +340,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1getKeyCodeForC
 
 
     //TODO: too simple to be correct
-    KeyCode kcode = XKeysymToKeycode(X_CURRENT_DISPLAY, XStringToKeysym((char *) &character));
+    KeyCode kcode = XKeysymToKeycode(main_ctx->display, XStringToKeysym((char *) &character));
 
     if (kcode == 0) {
         return com_sun_glass_events_KeyEvent_VK_UNDEFINED;
@@ -370,7 +370,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1isKeyLocked
         return com_sun_glass_events_KeyEvent_KEY_LOCK_UNKNOWN;
     }
 
-    Display *display = X_CURRENT_DISPLAY;
+    Display *display = main_ctx->display;
     Atom keyCodeAtom = None;
     switch (keyCode) {
         case com_sun_glass_events_KeyEvent_VK_CAPS_LOCK:
