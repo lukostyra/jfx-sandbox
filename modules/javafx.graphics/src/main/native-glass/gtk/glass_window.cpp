@@ -343,7 +343,6 @@ void WindowContextBase::process_mouse_button(XButtonEvent *event) {
     }
 }
 
-
 void WindowContextBase::process_mouse_motion(XMotionEvent* event) {
     jint glass_modifier = xlib_modifier_mask_to_glass(event->state);
 
@@ -784,7 +783,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
         hints.flags |= MWM_HINTS_DECORATIONS;
     }
 
-    Atom motif_atom = XInternAtom(display, "_MOTIF_WM_HINTS", true);
+    Atom motif_atom = XInternAtom(display, "_MOTIF_WM_HINTS", True);
     XChangeProperty(display, xwindow, motif_atom, motif_atom, 32,
                     PropModeReplace, (unsigned char *)&hints, sizeof (MwmHints)/sizeof (long));
 
@@ -998,6 +997,8 @@ void WindowContextTop::process_property(XPropertyEvent* event) {
         if (event->atom == frame_extents_atom) {
             update_frame_extents();
         } else if (event->atom == wm_state_atom) {
+            g_print("WM_STATE\n");
+
             //TODO
         }
     }
@@ -1255,7 +1256,7 @@ void WindowContextTop::exit_fullscreen() {
 
 void WindowContextTop::request_focus() {
 //    XRaiseWindow(display, xwindow);
-    XSetInputFocus(display, xwindow, RevertToParent, CurrentTime);
+//    XSetInputFocus(display, xwindow, RevertToParent, CurrentTime);
 }
 
 void WindowContextTop::set_focusable(bool focusable) {
@@ -1271,8 +1272,8 @@ void WindowContextTop::set_title(const char* title) {
     XSetWMName(display, xwindow, (XTextProperty *) title);
 
     XChangeProperty(display, xwindow,
-                   XInternAtom(display, "_NET_WM_NAME", true),
-                   XInternAtom(display, "UTF8_STRING", true), 8,
+                   XInternAtom(display, "_NET_WM_NAME", True),
+                   XInternAtom(display, "UTF8_STRING", True), 8,
                    PropModeReplace, (unsigned char*) title, strlen(title));
 }
 

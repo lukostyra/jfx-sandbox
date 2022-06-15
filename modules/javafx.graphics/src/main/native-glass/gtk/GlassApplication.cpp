@@ -30,7 +30,6 @@
 #include <X11/XKBlib.h>
 #include <X11/Xresource.h>
 
-#include <gtk/gtk.h>
 #include <glib.h>
 
 #include <cstdlib>
@@ -262,8 +261,6 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
 
     env->ExceptionClear();
 
-    //TODO: remove
-    gtk_init(NULL, NULL);
     Display *display = XOpenDisplay(NULL);
     X_CURRENT_DISPLAY = display;
 
