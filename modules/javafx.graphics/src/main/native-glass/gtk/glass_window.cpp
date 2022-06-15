@@ -696,7 +696,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
                             CWEventMask  | CWOverrideRedirect | CWBitGravity |
                             CWColormap | CWBackPixel | CWBorderPixel, &attr);
 
-    if (XSaveContext(display, xwindow, X_CONTEXT, XPointer(this)) != 0) {
+    if (XSaveContext(display, xwindow, main_ctx->data_context, XPointer(this)) != 0) {
         g_print("Fail to save context\n");
     }
 
@@ -1494,6 +1494,6 @@ void WindowContextTop::process_destroy() {
         owner->remove_child(this);
     }
 
-    XDeleteContext(display, xwindow, X_CONTEXT);
+    XDeleteContext(display, xwindow, main_ctx->data_context);
     WindowContextBase::process_destroy();
 }

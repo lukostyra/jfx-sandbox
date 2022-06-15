@@ -54,7 +54,6 @@
 #define JLONG_TO_PTR(value) ((void*)(intptr_t)(value))
 #define PTR_TO_JLONG(value) ((jlong)(intptr_t)(value))
 
-extern int X_CONTEXT;
 #define FILE_PREFIX "file://"
 #define URI_LIST_COMMENT_PREFIX "#"
 #define URI_LIST_LINE_BREAK "\r\n"
@@ -136,11 +135,11 @@ private:
         int xsync_event_base;
         int xdamage_event_base;
         int xkb_event_type;
+        int data_context;
         XSettingsClient *settings_client;
     } MainContext;
 
     extern MainContext * main_ctx;
-    extern char const * const GDK_WINDOW_DATA_CONTEXT;
 
     Cursor get_native_cursor(int type);
 

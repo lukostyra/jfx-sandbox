@@ -171,7 +171,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             continue;
         }
 
-        if (XFindContext(display, xevent.xany.window, X_CONTEXT, (XPointer *) &ctx) != 0) {
+        if (XFindContext(display, xevent.xany.window, main_ctx->data_context, (XPointer *) &ctx) != 0) {
             //g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
             continue;
         }
@@ -257,6 +257,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
 
     GSource *source = g_source_new(&x11_event_funcs, sizeof(MainContext));
     main_ctx = ((MainContext *) source);
+    main_ctx->data_context = XUniqueContext();
 
     Display *display = XOpenDisplay(NULL);
     main_ctx->display = display;

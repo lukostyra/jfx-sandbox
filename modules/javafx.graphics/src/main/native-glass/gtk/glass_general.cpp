@@ -27,10 +27,8 @@
 #include <jni.h>
 #include <gtk/gtk.h>
 
-char const * const GDK_WINDOW_DATA_CONTEXT = "glass_window_context";
 MainContext* main_ctx = NULL;
 
-int X_CONTEXT = XUniqueContext();
 jclass jStringCls;
 jclass jByteBufferCls;
 jmethodID jByteBufferArray;
