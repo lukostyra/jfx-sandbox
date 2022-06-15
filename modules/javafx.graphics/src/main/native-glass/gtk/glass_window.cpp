@@ -66,16 +66,11 @@ bool WindowContextBase::isEnabled() {
 
 void WindowContextBase::notify_state(jint glass_state) {
     if (glass_state == com_sun_glass_events_WindowEvent_RESTORE) {
-        if (is_maximized) {
-            glass_state = com_sun_glass_events_WindowEvent_MAXIMIZE;
-        }
-
-//        int w, h;
-//        glass_gdk_window_get_size(gdk_window, &w, &h);
 //        if (jview) {
 //            mainEnv->CallVoidMethod(jview,
-//                    jViewNotifyRepaint,
-//                    0, 0, w, h);
+//                    jViewNotifyRepaint, 0, 0,
+//                    geometry_get_content_width(&geometry),
+//                    geometry_get_content_height(&geometry));
 //            CHECK_JNI_EXCEPTION(mainEnv);
 //        }
     }
@@ -87,38 +82,6 @@ void WindowContextBase::notify_state(jint glass_state) {
        CHECK_JNI_EXCEPTION(mainEnv);
     }
 }
-//
-//void WindowContextBase::process_state(GdkEventWindowState* event) {
-//    if (event->changed_mask &
-//            (GDK_WINDOW_STATE_ICONIFIED | GDK_WINDOW_STATE_MAXIMIZED)) {
-//
-//        if (event->changed_mask & GDK_WINDOW_STATE_ICONIFIED) {
-//            is_iconified = event->new_window_state & GDK_WINDOW_STATE_ICONIFIED;
-//        }
-//        if (event->changed_mask & GDK_WINDOW_STATE_MAXIMIZED) {
-//            is_maximized = event->new_window_state & GDK_WINDOW_STATE_MAXIMIZED;
-//        }
-//
-//        jint stateChangeEvent;
-//
-//        if (is_iconified) {
-//            stateChangeEvent = com_sun_glass_events_WindowEvent_MINIMIZE;
-//        } else if (is_maximized) {
-//            stateChangeEvent = com_sun_glass_events_WindowEvent_MAXIMIZE;
-//        } else {
-//            stateChangeEvent = com_sun_glass_events_WindowEvent_RESTORE;
-//            if ((gdk_windowManagerFunctions & GDK_FUNC_MINIMIZE) == 0) {
-//                // in this case - the window manager will not support the programatic
-//                // request to iconify - so we need to restore it now.
-////                gdk_window_set_functions(gdk_window, gdk_windowManagerFunctions);
-//            }
-//        }
-//
-//        notify_state(stateChangeEvent);
-//    } else if (event->changed_mask & GDK_WINDOW_STATE_ABOVE) {
-//        notify_on_top( event->new_window_state & GDK_WINDOW_STATE_ABOVE);
-//    }
-//}
 
 void WindowContextBase::process_visibility(XVisibilityEvent* event) {
     visibility_state = event->state;
@@ -730,7 +693,7 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     Atom protocols[3] = { XInternAtom(display, "WM_DELETE_WINDOW", True),
                           XInternAtom(display, "WM_TAKE_FOCUS", True),
                           XInternAtom(display, "_NET_WM_PING", True) };
-                                                                                                                                                                        //                          XInternAtom(display, "_NET_WM_SYNC_REQUEST", True) };
+//                          XInternAtom(display, "_NET_WM_SYNC_REQUEST", True) };
 
     XSetWMProtocols(display, xwindow, protocols, 3);
     g_print("X WINDOW ID = %ld\n", xwindow);
@@ -997,9 +960,68 @@ void WindowContextTop::process_property(XPropertyEvent* event) {
         if (event->atom == frame_extents_atom) {
             update_frame_extents();
         } else if (event->atom == wm_state_atom) {
-            g_print("WM_STATE\n");
+            Atom type;
+            gint format;
+            gulong nitems;
+            gulong bytes_after;
+            guchar *data;
+            Atom *atoms = NULL;
 
-            //TODO
+            type = None;
+
+            XGetWindowProperty (display, xwindow, wm_state_atom, 0, G_MAXLONG, False,
+                                XA_ATOM, &type, &format, &nitems, &bytes_after, &data);
+
+            if (type != None) {
+                Atom maxvert_atom = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_VERT", True);
+                //Atom maxhorz_atom = XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", True);
+                Atom fullscreen_atom = XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", True);
+                Atom focused_atom = XInternAtom(display, "_NET_WM_STATE_FOCUSED", True);
+                Atom hidden_atom = XInternAtom(display, "_NET_WM_STATE_HIDDEN", True);
+                Atom above_atom = XInternAtom(display, "_NET_WM_STATE_ABOVE", True);
+                atoms = (Atom *)data;
+
+                bool iconified = false;
+                bool maximized = false;
+
+                gulong i = 0;
+                while (i < nitems) {
+                    if (atoms[i] == maxvert_atom) {
+                        maximized = true;
+                    } else if (atoms[i] == fullscreen_atom) {
+                        //TODO
+                    } else if (atoms[i] == focused_atom) {
+                        //TODO
+                    } else if (atoms[i] == hidden_atom) {
+                        iconified = true;
+                    } else if (atoms[i] == above_atom) {
+                        notify_on_top(true);
+                    }
+                    ++i;
+                }
+
+                if (iconified && !is_iconified) {
+                    is_iconified = true;
+                    notify_state(com_sun_glass_events_WindowEvent_MINIMIZE);
+                    g_print("===> notify minimize\n");
+                } else if (!iconified && is_iconified) {
+                    is_iconified = false;
+                    notify_state(com_sun_glass_events_WindowEvent_RESTORE);
+                    g_print("===> notify restore\n");
+                }
+
+                if (maximized && !is_maximized) {
+                    is_maximized = true;
+                    notify_state(com_sun_glass_events_WindowEvent_MAXIMIZE);
+                    g_print("===> notify maximized\n");
+                } else if (!maximized && is_maximized) {
+                    is_maximized = false;
+                    notify_state(com_sun_glass_events_WindowEvent_RESTORE);
+                    g_print("===> notify restore maximized\n");
+                }
+
+                XFree(atoms);
+            }
         }
     }
 }
@@ -1213,11 +1235,16 @@ void WindowContextTop::set_minimized(bool minimize) {
     is_iconified = minimize;
 
     if (map_received) {
-        XIconifyWindow(display, xwindow, screen);
-    } else {
-        change_wm_state(minimize,
-                        XInternAtom(display, "_NET_WM_STATE_HIDDEN", True), None);
+        if (minimize) {
+            XIconifyWindow(display, xwindow, screen);
+        } else {
+            g_print("mapping\n");
+            XMapWindow(display, xwindow);
+        }
     }
+
+    change_wm_state(minimize,
+                    XInternAtom(display, "_NET_WM_STATE_HIDDEN", True), None);
 }
 
 void WindowContextTop::set_maximized(bool maximize) {
@@ -1385,18 +1412,10 @@ void WindowContextTop::set_gravity(float x, float y) {
 
 void WindowContextTop::notify_on_top(bool top) {
     // Do not report effective (i.e. native) values to the FX, only if the user sets it manually
-//    if (top != effective_on_top() && jwindow) {
-//        if (on_top_inherited() && !top) {
-//            // Disallow user's "on top" handling on windows that inherited the property
-////            gtk_window_set_keep_above(GTK_WINDOW(gtk_widget), TRUE);
-//        } else {
-//            on_top = top;
-//            mainEnv->CallVoidMethod(jwindow,
-//                    jWindowNotifyLevelChanged,
-//                    top ? com_sun_glass_ui_Window_Level_FLOATING :  com_sun_glass_ui_Window_Level_NORMAL);
-//            CHECK_JNI_EXCEPTION(mainEnv);
-//        }
-//    }
+    mainEnv->CallVoidMethod(jwindow,
+            jWindowNotifyLevelChanged,
+            top ? com_sun_glass_ui_Window_Level_FLOATING :  com_sun_glass_ui_Window_Level_NORMAL);
+    CHECK_JNI_EXCEPTION(mainEnv);
 }
 
 void WindowContextTop::notify_window_resize() {
@@ -1450,8 +1469,7 @@ void WindowContextTop::set_level(int level) {
         on_top = true;
     }
 
-    change_wm_state(on_top,
-                    XInternAtom(display, "_NET_WM_STATE_ABOVE", True), None);
+    change_wm_state(on_top, XInternAtom(display, "_NET_WM_STATE_ABOVE", True), None);
 }
 
 void WindowContextTop::set_owner(WindowContext * owner_ctx) {

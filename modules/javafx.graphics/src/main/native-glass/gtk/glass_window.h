@@ -292,7 +292,6 @@ public:
     void process_mouse_motion(XMotionEvent*);
     void process_mouse_cross(XCrossingEvent*);
     void process_key(XKeyEvent*);
-//    void process_state(GdkEventWindowState*);
     void process_visibility(XVisibilityEvent*);
     void notify_state(jint);
 
