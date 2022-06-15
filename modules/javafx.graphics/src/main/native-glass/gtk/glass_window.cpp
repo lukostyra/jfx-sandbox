@@ -137,9 +137,11 @@ bool WindowContextBase::is_dead() {
 
 void destroy_and_delete_ctx(WindowContext* ctx) {
     if (ctx) {
+        g_print("process_destroy...\n");
         ctx->process_destroy();
 
         if (!ctx->get_events_count()) {
+            g_print("delete\n");
             delete ctx;
         }
         // else: ctx will be deleted in EventsCounterHelper after completing
@@ -148,35 +150,38 @@ void destroy_and_delete_ctx(WindowContext* ctx) {
 }
 
 void WindowContextBase::process_destroy() {
-    if (WindowContextBase::sm_mouse_drag_window == this) {
-        ungrab_mouse_drag_focus();
-    }
-
-    if (WindowContextBase::sm_grab_window == this) {
-        ungrab_focus();
-    }
+//    if (WindowContextBase::sm_mouse_drag_window == this) {
+//        ungrab_mouse_drag_focus();
+//    }
+//
+//    if (WindowContextBase::sm_grab_window == this) {
+//        ungrab_focus();
+//    }
+    g_print("WindowContextBase::process_destroy...\n");
 
     std::set<WindowContextTop*>::iterator it;
     for (it = children.begin(); it != children.end(); ++it) {
-        // FIX JDK-8226537: this method calls set_owner(NULL) which prevents
-        // WindowContextTop::process_destroy() to call remove_child() (because children
-        // is being iterated here) but also prevents gtk_window_set_transient_for from
-        // being called - this causes the crash on gnome.
-//        gtk_window_set_transient_for((*it)->get_gtk_window(), NULL);
+        XSetTransientForHint(display, (*it)->get_window_xid(), None);
         (*it)->set_owner(NULL);
         destroy_and_delete_ctx(*it);
     }
     children.clear();
+
+    g_print("WindowContextBase::process_destroy 2...\n");
 
     if (jwindow) {
         mainEnv->CallVoidMethod(jwindow, jWindowNotifyDestroy);
         EXCEPTION_OCCURED(mainEnv);
     }
 
+    g_print("WindowContextBase::process_destroy 3...\n");
+
     if (jview) {
         mainEnv->DeleteGlobalRef(jview);
         jview = NULL;
     }
+
+    g_print("WindowContextBase::process_destroy 4...\n");
 
     if (jwindow) {
         mainEnv->DeleteGlobalRef(jwindow);
@@ -184,6 +189,8 @@ void WindowContextBase::process_destroy() {
     }
 
     can_be_deleted = true;
+    g_print("WindowContextBase::process_destroy end...\n");
+
 }
 
 void WindowContextBase::process_delete() {
@@ -612,6 +619,7 @@ void WindowContextBase::set_background(float r, float g, float b) {
 }
 
 WindowContextBase::~WindowContextBase() {
+    g_print("DESTRUCTION!\n");
     if (xim.ic) {
         XDestroyIC(xim.ic);
         xim.ic = NULL;
@@ -620,6 +628,8 @@ WindowContextBase::~WindowContextBase() {
         XCloseIM(xim.im);
         xim.im = NULL;
     }
+
+//    XUnmapWindow(display, xwindow);
     XDestroyWindow(display, xwindow);
 }
 
@@ -944,7 +954,7 @@ void WindowContextTop::process_client_message(XClientMessageEvent* event) {
         } else if (XInternAtom(display, "WM_TAKE_FOCUS", True) == atom) {
             XSetInputFocus(display, xwindow, RevertToParent, event->data.l[1]);
         } else if (XInternAtom(display, "WM_DELETE_WINDOW", True) == atom) {
-            process_destroy();
+            destroy_and_delete_ctx(this);
         }
     }
 }
@@ -1239,6 +1249,7 @@ void WindowContextTop::set_minimized(bool minimize) {
             XIconifyWindow(display, xwindow, screen);
         } else {
             g_print("mapping\n");
+            //XRaiseWindow(display, xwindow);
             XMapWindow(display, xwindow);
         }
     }
@@ -1477,9 +1488,12 @@ void WindowContextTop::set_owner(WindowContext * owner_ctx) {
 }
 
 void WindowContextTop::process_destroy() {
+    g_print("WindowContextTop::process_destroy\n");
     if (owner) {
+        g_print("owner->remove_child\n");
         owner->remove_child(this);
     }
 
+    XDeleteContext(display, xwindow, X_CONTEXT);
     WindowContextBase::process_destroy();
 }

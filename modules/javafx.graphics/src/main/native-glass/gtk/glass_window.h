@@ -398,7 +398,7 @@ public:
     ~EventsCounterHelper() {
         ctx->decrement_events_counter();
         if (ctx->is_dead() && ctx->get_events_count() == 0) {
-            delete ctx;
+           delete ctx;
         }
         ctx = NULL;
     }

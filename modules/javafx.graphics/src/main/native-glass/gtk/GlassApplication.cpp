@@ -186,6 +186,10 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             continue;
         }
 
+        if (ctx == NULL) {
+            continue;
+        }
+
         if (ctx->hasIME() && ctx->filterIME(&xevent)) {
             continue;
         }
