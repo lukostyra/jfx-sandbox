@@ -203,7 +203,7 @@ public:
     virtual void remove_child(WindowContextTop* child) = 0;
     virtual bool set_view(jobject) = 0;
 
-    virtual XID get_window_xid() = 0;
+    virtual Window get_window() = 0;
     virtual jobject get_jview() = 0;
     virtual jobject get_jwindow() = 0;
 
@@ -237,6 +237,7 @@ protected:
     bool is_iconified;
     bool is_maximized;
     bool is_mouse_entered;
+    bool is_disabled;
 
     /*
      * sm_grab_window points to WindowContext holding a mouse grab.
@@ -263,7 +264,7 @@ public:
     void enableOrResetIME();
     void disableIME();
     void paint(void*, jint, jint);
-    XID get_window_xid();
+    Window get_window();
     jobject get_jwindow();
     jobject get_jview();
 

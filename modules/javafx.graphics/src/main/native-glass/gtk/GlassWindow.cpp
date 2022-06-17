@@ -553,7 +553,7 @@ JNIEXPORT jlong JNICALL Java_com_sun_glass_ui_gtk_GtkWindow__1getNativeWindowImp
     (void)obj;
 
     WindowContext* ctx = JLONG_TO_WINDOW_CTX(ptr);
-    return ctx->get_window_xid();
+    return ctx->get_window();
 }
 /*
  * Class:     com_sun_glass_ui_gtk_GtkWindow

@@ -42,7 +42,7 @@
 WindowContext * WindowContextBase::sm_grab_window = NULL;
 WindowContext * WindowContextBase::sm_mouse_drag_window = NULL;
 
-XID WindowContextBase::get_window_xid() {
+Window WindowContextBase::get_window() {
     return xwindow;
 }
 
@@ -161,7 +161,7 @@ void WindowContextBase::process_destroy() {
 
     std::set<WindowContextTop*>::iterator it;
     for (it = children.begin(); it != children.end(); ++it) {
-        XSetTransientForHint(display, (*it)->get_window_xid(), None);
+        XSetTransientForHint(display, (*it)->get_window(), None);
         (*it)->set_owner(NULL);
         destroy_and_delete_ctx(*it);
     }
@@ -470,12 +470,12 @@ void WindowContextBase::paint(void* data, jint width, jint height) {
 
 void WindowContextBase::add_child(WindowContextTop* child) {
     children.insert(child);
-    XSetTransientForHint(display, child->get_window_xid(), xwindow);
+    XSetTransientForHint(display, child->get_window(), xwindow);
 }
 
 void WindowContextBase::remove_child(WindowContextTop* child) {
     children.erase(child);
-    XSetTransientForHint(display, child->get_window_xid(), None);
+    XSetTransientForHint(display, child->get_window(), None);
 }
 
 void WindowContextBase::show_or_hide_children(bool show) {
@@ -690,11 +690,18 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
     attr.win_gravity = NorthWestGravity;
     attr.event_mask = WINDOW_EVENT_MASK;
 
-    xparent = (owner) ? owner->get_window_xid() : DefaultRootWindow(display);
+    if (owner) {
+        xparent = owner->get_window();
+    } else {
+        xparent = DefaultRootWindow(display);
+    }
+
     xwindow = XCreateWindow(display, xparent, 0, 0, 1, 1, 0,
                             vinfo.depth, InputOutput, vinfo.visual,
                             CWEventMask  | CWOverrideRedirect | CWBitGravity |
                             CWColormap | CWBackPixel | CWBorderPixel, &attr);
+
+    g_print("X WINDOW ID = %ld\n", xwindow);
 
     if (XSaveContext(display, xwindow, main_ctx->data_context, XPointer(this)) != 0) {
         g_print("Fail to save context\n");
@@ -706,7 +713,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 //                          XInternAtom(display, "_NET_WM_SYNC_REQUEST", True) };
 
     XSetWMProtocols(display, xwindow, protocols, 3);
-    g_print("X WINDOW ID = %ld\n", xwindow);
 
     Atom type_atom;
     switch (type) {
@@ -1097,7 +1103,7 @@ void WindowContextTop::update_window_constraints() {
     hints->win_gravity = NorthWestGravity;
     hints->flags = (PMinSize | PMaxSize | PWinGravity);
 
-    if (resizable.value) {
+    if (resizable.value && !is_disabled) {
         int min_w = (resizable.minw == -1) ? 1
                       : resizable.minw - geometry.extents.left - geometry.extents.right;
         int min_h =  (resizable.minh == -1) ? 1
@@ -1153,6 +1159,7 @@ void WindowContextTop::set_visible(bool visible) {
 
 void WindowContextTop::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h, int cw, int ch) {
     g_print("set_bounds: %d, %d, %d, %d, %d, %d\n", x, y, w, h, cw, ch);
+
 
     requested_bounds.width = w;
     requested_bounds.height = h;
@@ -1296,8 +1303,8 @@ void WindowContextTop::exit_fullscreen() {
 }
 
 void WindowContextTop::request_focus() {
-//    XRaiseWindow(display, xwindow);
-//    XSetInputFocus(display, xwindow, RevertToParent, CurrentTime);
+    XRaiseWindow(display, xwindow);
+ //   XSetInputFocus(display, xwindow, RevertToNone, CurrentTime);
 }
 
 void WindowContextTop::set_focusable(bool focusable) {
@@ -1344,7 +1351,8 @@ void WindowContextTop::set_alpha(double alpha) {
 }
 
 void WindowContextTop::set_enabled(bool enabled) {
-
+    is_disabled = !enabled;
+    update_window_constraints();
 }
 
 void WindowContextTop::set_minimum_size(int w, int h) {
