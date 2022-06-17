@@ -1113,7 +1113,7 @@ void WindowContextTop::update_window_constraints() {
                            : resizable.maxh - geometry.extents.top - geometry.extents.bottom;
 
         g_print("min/max size (resizable) %d,%d/%d,%d\n", hints->min_width, hints->min_height,
-            hints->max_width, hints->max_height);
+                hints->max_width, hints->max_height);
 
     } else {
         int w = geometry_get_content_width(&geometry);
@@ -1237,18 +1237,19 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
         }
     }
 
+    g_print("XReconfigureWMWindow\n");
     XReconfigureWMWindow(display, xwindow, 0, windowChangesMask, windowChanges);
     XFlush(display);
 }
 
 void WindowContextTop::set_minimized(bool minimize) {
+    g_print("set_minimized %d\n", minimize);
     is_iconified = minimize;
 
     if (map_received) {
         if (minimize) {
             XIconifyWindow(display, xwindow, screen);
         } else {
-            g_print("mapping\n");
             //XRaiseWindow(display, xwindow);
             XMapWindow(display, xwindow);
         }
@@ -1259,6 +1260,7 @@ void WindowContextTop::set_minimized(bool minimize) {
 }
 
 void WindowContextTop::set_maximized(bool maximize) {
+    g_print("set_maximized %d\n", maximize);
     is_maximized = maximize;
 
     change_wm_state(maximize,
@@ -1267,6 +1269,7 @@ void WindowContextTop::set_maximized(bool maximize) {
 }
 
 void WindowContextTop::change_wm_state(bool add, Atom state1, Atom state2) {
+    g_print("change_wm_state\n");
     XClientMessageEvent xclient;
 
     memset(&xclient, 0, sizeof (xclient));
@@ -1298,6 +1301,7 @@ void WindowContextTop::request_focus() {
 }
 
 void WindowContextTop::set_focusable(bool focusable) {
+    g_print("set_focusable %d\n", focusable);
     XWMHints *hints = XAllocWMHints();
     hints->input = (focusable) ? True : False;
     hints->flags = InputHint;
@@ -1307,7 +1311,8 @@ void WindowContextTop::set_focusable(bool focusable) {
 }
 
 void WindowContextTop::set_title(const char* title) {
-    XSetWMName(display, xwindow, (XTextProperty *) title);
+    g_print("set_title\n");
+//    XSetWMName(display, xwindow, (XTextProperty *) title);
 
     XChangeProperty(display, xwindow,
                    XInternAtom(display, "_NET_WM_NAME", True),
@@ -1327,7 +1332,7 @@ void WindowContextTop::set_alpha(double alpha) {
         target_opacity = alpha;
     }
 
-    g_print("=========> Set Alpha %f\n", alpha);
+    g_print("set_alpha %f\n", alpha);
     cardinal = target_opacity * 0xffffffff;
 
     if (cardinal == 0xffffffff) {
@@ -1473,6 +1478,7 @@ void WindowContextTop::notify_window_move() {
 }
 
 void WindowContextTop::set_level(int level) {
+    g_print("set_level %d\n", level);
     if (level == com_sun_glass_ui_Window_Level_NORMAL) {
         on_top = false;
     } else if (level == com_sun_glass_ui_Window_Level_FLOATING
