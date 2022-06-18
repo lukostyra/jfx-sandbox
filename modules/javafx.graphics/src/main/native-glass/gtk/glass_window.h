@@ -135,97 +135,20 @@ struct WindowGeometry {
     int current_height;
 
     WindowFrameExtents extents;
-
 };
-
-class WindowContextTop;
 
 class WindowContext {
-public:
-    virtual bool isEnabled() = 0;
-    virtual bool hasIME() = 0;
-    virtual bool filterIME(XEvent *) = 0;
-    virtual void enableOrResetIME() = 0;
-    virtual void disableIME() = 0;
-    virtual void paint(void* data, jint width, jint height) = 0;
-    virtual WindowFrameExtents get_frame_extents() = 0;
-
-    virtual void enter_fullscreen() = 0;
-    virtual void exit_fullscreen() = 0;
-    virtual void show_or_hide_children(bool) = 0;
-    virtual void set_visible(bool) = 0;
-    virtual bool is_visible() = 0;
-    virtual void set_bounds(int, int, bool, bool, int, int, int, int) = 0;
-    virtual void set_resizable(bool) = 0;
-    virtual void request_focus() = 0;
-    virtual void set_focusable(bool)= 0;
-    virtual bool grab_focus() = 0;
-    virtual bool grab_mouse_drag_focus() = 0;
-    virtual void ungrab_focus() = 0;
-    virtual void ungrab_mouse_drag_focus() = 0;
-    virtual void set_title(const char*) = 0;
-    virtual void set_alpha(double) = 0;
-    virtual void set_enabled(bool) = 0;
-    virtual void set_minimum_size(int, int) = 0;
-    virtual void set_maximum_size(int, int) = 0;
-    virtual void set_minimized(bool) = 0;
-    virtual void set_maximized(bool) = 0;
-    virtual void set_icon(cairo_surface_t*) = 0;
-    virtual void restack(bool) = 0;
-    virtual void set_cursor(Cursor) = 0;
-    virtual void set_modal(bool, WindowContext* parent = NULL) = 0;
-    virtual void set_gravity(float, float) = 0;
-    virtual void set_level(int) = 0;
-    virtual void set_background(float, float, float) = 0;
-
-    virtual void process_property(XPropertyEvent*) = 0;
-    virtual void process_client_message(XClientMessageEvent*) = 0;
-    virtual void process_configure(XConfigureEvent*) = 0;
-    virtual void process_map() = 0;
-    virtual void process_focus(XFocusChangeEvent*) = 0;
-    virtual void process_destroy() = 0;
-    virtual void process_delete() = 0;
-    virtual void process_expose(XExposeEvent *) = 0;
-    virtual void process_damage(XDamageNotifyEvent *) = 0;
-    virtual void process_mouse_button(XButtonEvent*) = 0;
-    virtual void process_mouse_motion(XMotionEvent *) = 0;
-    virtual void process_mouse_cross(XCrossingEvent*) = 0;
-    virtual void process_key(XKeyEvent*) = 0;
-//    virtual void process_state(GdkEventWindowState*) = 0;
-    virtual void process_visibility(XVisibilityEvent*) = 0;
-
-    virtual void notify_state(jint) = 0;
-    virtual void notify_window_resize() = 0;
-    virtual void notify_window_move() = 0;
-    virtual void notify_on_top(bool) {}
-
-    virtual void add_child(WindowContextTop* child) = 0;
-    virtual void remove_child(WindowContextTop* child) = 0;
-    virtual bool set_view(jobject) = 0;
-
-    virtual Window get_window() = 0;
-    virtual jobject get_jview() = 0;
-    virtual jobject get_jwindow() = 0;
-
-    virtual void increment_events_counter() = 0;
-    virtual void decrement_events_counter() = 0;
-    virtual size_t get_events_count() = 0;
-    virtual bool is_dead() = 0;
-    virtual ~WindowContext() {}
-};
-
-class WindowContextBase: public WindowContext {
-
-    struct _XIM{
-        XIM im;
-        XIC ic;
-        bool enabled;
-    } xim;
+private:
 
     size_t events_processing_cnt;
+    jlong screen;
+    WindowFrameType frame_type;
+    WindowType window_type;
+    struct WindowContext *owner;
+    WindowGeometry geometry;
+
     bool can_be_deleted;
-protected:
-    std::set<WindowContextTop*> children;
+    std::set<WindowContext*> children;
     jobject jwindow;
     jobject jview;
     Window xwindow;
@@ -257,61 +180,13 @@ protected:
      * should be reported during this drag.
      */
     static WindowContext* sm_mouse_drag_window;
-public:
-    bool isEnabled();
-    bool hasIME();
-    bool filterIME(XEvent *);
-    void enableOrResetIME();
-    void disableIME();
-    void paint(void*, jint, jint);
-    Window get_window();
-    jobject get_jwindow();
-    jobject get_jview();
 
-    void add_child(WindowContextTop*);
-    void remove_child(WindowContextTop*);
-    void show_or_hide_children(bool);
-    void reparent_children(WindowContext* parent);
-    void set_visible(bool);
-    bool is_visible();
-    bool set_view(jobject);
-    bool grab_focus();
-    bool grab_mouse_drag_focus();
-    void ungrab_focus();
-    void ungrab_mouse_drag_focus();
-    void set_cursor(Cursor);
-    void set_level(int) {}
-    void set_background(float, float, float);
-
-    void process_map() {}
-    void process_focus(XFocusChangeEvent*);
-    void process_destroy();
-    void process_delete();
-    void process_expose(XExposeEvent *);
-    void process_damage(XDamageNotifyEvent *);
-    void process_mouse_button(XButtonEvent*);
-    void process_mouse_motion(XMotionEvent*);
-    void process_mouse_cross(XCrossingEvent*);
-    void process_key(XKeyEvent*);
-    void process_visibility(XVisibilityEvent*);
-    void notify_state(jint);
-
-    void increment_events_counter();
-    void decrement_events_counter();
-    size_t get_events_count();
-    bool is_dead();
-
-    ~WindowContextBase();
-private:
-    bool im_filter_keypress(XKeyEvent*);
-};
-
-class WindowContextTop: public WindowContextBase {
-    jlong screen;
-    WindowFrameType frame_type;
-    WindowType window_type;
-    struct WindowContext *owner;
-    WindowGeometry geometry;
+    struct _XIM {
+        _XIM() : im(NULL), ic(NULL), enabled(FALSE) {}
+        XIM im;
+        XIC ic;
+        bool enabled;
+    } xim;
     struct _Resizable{// we can't use set/get gtk_window_resizable function
         _Resizable(): value(true), minw(-1), minh(-1), maxw(-1), maxh(-1) {}
         bool value; //actual value of resizable for a window
@@ -337,13 +212,54 @@ class WindowContextTop: public WindowContextBase {
 
     static WindowFrameExtents normal_extents;
     static WindowFrameExtents utility_extents;
+
 public:
-    WindowContextTop(jobject, WindowContext*, long, WindowFrameType, WindowType, int);
+    WindowContext(jobject, WindowContext*, long, WindowFrameType, WindowType, int);
+    bool isEnabled();
+    bool hasIME();
+    bool filterIME(XEvent *);
+    void enableOrResetIME();
+    void disableIME();
+    void paint(void*, jint, jint);
+    Window get_window();
+    jobject get_jwindow();
+    jobject get_jview();
+
+    void add_child(WindowContext*);
+    void remove_child(WindowContext*);
+    void show_or_hide_children(bool);
+    void reparent_children(WindowContext* parent);
+    void set_visible(bool);
+    bool is_visible();
+    bool set_view(jobject);
+    bool grab_focus();
+    bool grab_mouse_drag_focus();
+    void ungrab_focus();
+    void ungrab_mouse_drag_focus();
+    void set_cursor(Cursor);
+    void set_background(float, float, float);
+
+    void process_focus(XFocusChangeEvent*);
+    void process_delete();
+    void process_expose(XExposeEvent *);
+    void process_damage(XDamageNotifyEvent *);
+    void process_mouse_button(XButtonEvent*);
+    void process_mouse_motion(XMotionEvent*);
+    void process_mouse_cross(XCrossingEvent*);
+    void process_key(XKeyEvent*);
+    void process_visibility(XVisibilityEvent*);
     void process_map();
     void process_property(XPropertyEvent*);
     void process_client_message(XClientMessageEvent*);
     void process_configure(XConfigureEvent*);
     void process_destroy();
+    void notify_state(jint);
+
+    void increment_events_counter();
+    void decrement_events_counter();
+    size_t get_events_count();
+    bool is_dead();
+
     void change_wm_state(bool add, Atom state1, Atom state2);
 
     WindowFrameExtents get_frame_extents();
@@ -364,7 +280,6 @@ public:
     void set_modal(bool, WindowContext* parent = NULL);
     void set_gravity(float, float);
     void set_level(int);
-    void set_visible(bool);
     void notify_on_top(bool);
     void notify_window_resize();
     void notify_window_move();
@@ -375,15 +290,16 @@ public:
     void set_owner(WindowContext*);
 
     void detach_from_java();
+
+    ~WindowContext();
 private:
+    bool im_filter_keypress(XKeyEvent*);
     bool get_frame_extents_property(int *, int *, int *, int *);
     void activate_window();
     void update_frame_extents();
 //    void request_frame_extents();
     void window_configure(XWindowChanges *, unsigned int);
     void update_window_constraints();
-    WindowContextTop(WindowContextTop&);
-    WindowContextTop& operator= (const WindowContextTop&);
 };
 
 void destroy_and_delete_ctx(WindowContext* ctx);
@@ -399,6 +315,7 @@ public:
     ~EventsCounterHelper() {
         ctx->decrement_events_counter();
         if (ctx->is_dead() && ctx->get_events_count() == 0) {
+           g_print("event count helper\n");
            delete ctx;
         }
         ctx = NULL;

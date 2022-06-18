@@ -35,7 +35,7 @@ static Cursor emptyCursor = 0;
 static Cursor get_empty_cursor() {
     if (emptyCursor == 0) {
         XColor color;
-        char data[1];
+        char data[1] = { 0 };
         Pixmap pixmap = XCreateBitmapFromData(main_ctx->display, DefaultRootWindow(main_ctx->display), data, 1, 1);
         emptyCursor = XCreatePixmapCursor(main_ctx->display, pixmap, pixmap, &color, &color, 0, 0);
 

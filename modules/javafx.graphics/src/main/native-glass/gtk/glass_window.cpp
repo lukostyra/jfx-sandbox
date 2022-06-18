@@ -39,609 +39,20 @@
 #include <string.h>
 #include <algorithm>
 
-WindowContext * WindowContextBase::sm_grab_window = NULL;
-WindowContext * WindowContextBase::sm_mouse_drag_window = NULL;
-
-Window WindowContextBase::get_window() {
-    return xwindow;
-}
-
-jobject WindowContextBase::get_jview() {
-    return jview;
-}
-
-jobject WindowContextBase::get_jwindow() {
-    return jwindow;
-}
-
-bool WindowContextBase::isEnabled() {
-    if (jwindow) {
-        bool result = (JNI_TRUE == mainEnv->CallBooleanMethod(jwindow, jWindowIsEnabled));
-        LOG_EXCEPTION(mainEnv)
-        return result;
-    } else {
-        return false;
-    }
-}
-
-void WindowContextBase::notify_state(jint glass_state) {
-    if (glass_state == com_sun_glass_events_WindowEvent_RESTORE) {
-//        if (jview) {
-//            mainEnv->CallVoidMethod(jview,
-//                    jViewNotifyRepaint, 0, 0,
-//                    geometry_get_content_width(&geometry),
-//                    geometry_get_content_height(&geometry));
-//            CHECK_JNI_EXCEPTION(mainEnv);
-//        }
-    }
-
-    if (jwindow) {
-       mainEnv->CallVoidMethod(jwindow,
-               jGtkWindowNotifyStateChanged,
-               glass_state);
-       CHECK_JNI_EXCEPTION(mainEnv);
-    }
-}
-
-void WindowContextBase::process_visibility(XVisibilityEvent* event) {
-    visibility_state = event->state;
-    g_print("Visibility %d\n", visibility_state);
-}
-
-void WindowContextBase::process_focus(XFocusChangeEvent* event) {
-    bool in = event->type == FocusIn;
-
-    if (!in && WindowContextBase::sm_mouse_drag_window == this) {
-        ungrab_mouse_drag_focus();
-    }
-    if (!in && WindowContextBase::sm_grab_window == this) {
-        ungrab_focus();
-    }
-
-    if (xim.enabled && xim.ic) {
-        if (in) {
-            XSetICFocus(xim.ic);
-        } else {
-            XUnsetICFocus(xim.ic);
-        }
-    }
-
-    if (jwindow) {
-        if (!in || isEnabled()) {
-            g_print("jWindowNotifyFocus\n");
-            mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus,
-                        in ? com_sun_glass_events_WindowEvent_FOCUS_GAINED : com_sun_glass_events_WindowEvent_FOCUS_LOST);
-            CHECK_JNI_EXCEPTION(mainEnv)
-        } else {
-            mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocusDisabled);
-            CHECK_JNI_EXCEPTION(mainEnv)
-        }
-    }
-}
-
-void WindowContextBase::increment_events_counter() {
-    ++events_processing_cnt;
-}
-
-void WindowContextBase::decrement_events_counter() {
-    --events_processing_cnt;
-}
-
-size_t WindowContextBase::get_events_count() {
-    return events_processing_cnt;
-}
-
-bool WindowContextBase::is_dead() {
-    return can_be_deleted;
-}
-
-void destroy_and_delete_ctx(WindowContext* ctx) {
-    if (ctx) {
-        g_print("process_destroy...\n");
-        ctx->process_destroy();
-
-        if (!ctx->get_events_count()) {
-            g_print("delete\n");
-            delete ctx;
-        }
-        // else: ctx will be deleted in EventsCounterHelper after completing
-        // an event processing
-    }
-}
-
-void WindowContextBase::process_destroy() {
-//    if (WindowContextBase::sm_mouse_drag_window == this) {
-//        ungrab_mouse_drag_focus();
-//    }
-//
-//    if (WindowContextBase::sm_grab_window == this) {
-//        ungrab_focus();
-//    }
-    g_print("WindowContextBase::process_destroy...\n");
-
-    std::set<WindowContextTop*>::iterator it;
-    for (it = children.begin(); it != children.end(); ++it) {
-        XSetTransientForHint(display, (*it)->get_window(), None);
-        (*it)->set_owner(NULL);
-        destroy_and_delete_ctx(*it);
-    }
-    children.clear();
-
-    g_print("WindowContextBase::process_destroy 2...\n");
-
-    if (jwindow) {
-        mainEnv->CallVoidMethod(jwindow, jWindowNotifyDestroy);
-        EXCEPTION_OCCURED(mainEnv);
-    }
-
-    g_print("WindowContextBase::process_destroy 3...\n");
-
-    if (jview) {
-        mainEnv->DeleteGlobalRef(jview);
-        jview = NULL;
-    }
-
-    g_print("WindowContextBase::process_destroy 4...\n");
-
-    if (jwindow) {
-        mainEnv->DeleteGlobalRef(jwindow);
-        jwindow = NULL;
-    }
-
-    can_be_deleted = true;
-    g_print("WindowContextBase::process_destroy end...\n");
-
-}
-
-void WindowContextBase::process_delete() {
-    if (jwindow && isEnabled()) {
-        mainEnv->CallVoidMethod(jwindow, jWindowNotifyClose);
-        CHECK_JNI_EXCEPTION(mainEnv)
-    }
-}
-
-void WindowContextBase::process_expose(XExposeEvent* event) {
-    if (jview) {
-        g_print("jViewNotifyRepaint %d, %d, %d, %d\n", event->x, event->y, event->width, event->height);
-        mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->x, event->y, event->width, event->height);
-        CHECK_JNI_EXCEPTION(mainEnv)
-    }
-}
-
-void WindowContextBase::process_damage(XDamageNotifyEvent* event) {
-    if (jview) {
-        g_print("DAMAGE: jViewNotifyRepaint %d, %d, %d, %d\n", event->area.x, event->area.y, event->area.width, event->area.height);
-        mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->area.x, event->area.y, event->area.width, event->area.height);
-        CHECK_JNI_EXCEPTION(mainEnv)
-    }
-}
-
-static inline jint xlib_button_number_to_mouse_button(guint button) {
-    switch (button) {
-        case 1:
-            return com_sun_glass_events_MouseEvent_BUTTON_LEFT;
-        case 2:
-            return com_sun_glass_events_MouseEvent_BUTTON_OTHER;
-        case 3:
-            return com_sun_glass_events_MouseEvent_BUTTON_RIGHT;
-        case 4:
-            return com_sun_glass_events_MouseEvent_BUTTON_FORWARD;
-        case 5:
-            return com_sun_glass_events_MouseEvent_BUTTON_BACK;
-        default:
-            // Other buttons are not supported by quantum and are not reported by other platforms
-            return com_sun_glass_events_MouseEvent_BUTTON_NONE;
-    }
-}
-
-void WindowContextBase::process_mouse_button(XButtonEvent *event) {
-    bool press = event->type == ButtonPress;
-    jint state = xlib_modifier_mask_to_glass(event->state);
-
-    int mask = 0;
-    switch (event->button) {
-        case 1:
-            mask = Button1Mask;
-            break;
-        case 2:
-            mask = Button2Mask;
-            break;
-        case 3:
-            mask = Button3Mask;
-            break;
-        case 4:
-            mask = Button4Mask;
-            break;
-        case 5:
-            mask = Button5Mask;
-            break;
-    }
-
-    if (press) {
-        state |= mask;
-    } else {
-        state &= ~mask;
-    }
-
-    g_print("Mouse button %d\n", event->button);
-    //scroll
-    if (event->button == 4 || event->button == 5) {
-        jdouble dx = 0;
-        jdouble dy = (event->button == 4) ? 1 : -1;
-
-        if (event->state & ShiftMask) {
-            jdouble t = dy;
-            dy = dx;
-            dx = t;
-        }
-
-        if (jview) {
-            mainEnv->CallVoidMethod(jview, jViewNotifyScroll,
-                    (jint) event->x, (jint) event->y,
-                    (jint) event->x_root, (jint) event->y_root,
-                    dx, dy, state,
-                    (jint) 0, (jint) 0,
-                    (jint) 0, (jint) 0,
-                    (jdouble) 40.0, (jdouble) 40.0);
-            CHECK_JNI_EXCEPTION(mainEnv)
-        }
-
-        return;
-    }
-
-    jint button = xlib_button_number_to_mouse_button(event->button);
-
-    if (jview && button != com_sun_glass_events_MouseEvent_BUTTON_NONE) {
-        g_print("jViewNotifyMouse press=%d, btn=%d, x,y=%d,%d\n", press, button, event->x, event->y);
-        mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
-                press ? com_sun_glass_events_MouseEvent_DOWN : com_sun_glass_events_MouseEvent_UP,
-                button,
-                (jint) event->x, (jint) event->y,
-                (jint) event->x_root, (jint) event->y_root,
-                state,
-                (event->button == 3 && press) ? JNI_TRUE : JNI_FALSE,
-                JNI_FALSE);
-        CHECK_JNI_EXCEPTION(mainEnv)
-
-        if (jview && event->button == 3 && press) {
-            mainEnv->CallVoidMethod(jview, jViewNotifyMenu,
-                    (jint)event->x, (jint)event->y,
-                    (jint)event->x_root, (jint)event->y_root,
-                    JNI_FALSE);
-            CHECK_JNI_EXCEPTION(mainEnv)
-        }
-    }
-}
-
-void WindowContextBase::process_mouse_motion(XMotionEvent* event) {
-    jint glass_modifier = xlib_modifier_mask_to_glass(event->state);
-
-    jint isDrag = glass_modifier & (
-            com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_PRIMARY |
-            com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_MIDDLE |
-            com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_SECONDARY |
-            com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_BACK |
-            com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_FORWARD);
-    jint button = com_sun_glass_events_MouseEvent_BUTTON_NONE;
-
-    if (glass_modifier & com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_PRIMARY) {
-        button = com_sun_glass_events_MouseEvent_BUTTON_LEFT;
-    } else if (glass_modifier & com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_MIDDLE) {
-        button = com_sun_glass_events_MouseEvent_BUTTON_OTHER;
-    } else if (glass_modifier & com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_SECONDARY) {
-        button = com_sun_glass_events_MouseEvent_BUTTON_RIGHT;
-    } else if (glass_modifier & com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_BACK) {
-        button = com_sun_glass_events_MouseEvent_BUTTON_BACK;
-    } else if (glass_modifier & com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_FORWARD) {
-        button = com_sun_glass_events_MouseEvent_BUTTON_FORWARD;
-    }
-
-//    g_print("Mouse motion %d, %d, %d, %d\n", event->x_root, event->y_root, event->x, event->y);
-    if (jview) {
-        mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
-                isDrag ? com_sun_glass_events_MouseEvent_DRAG : com_sun_glass_events_MouseEvent_MOVE,
-                button,
-                (jint) event->x, (jint) event->y,
-                (jint) event->x_root, (jint) event->y_root,
-                glass_modifier,
-                JNI_FALSE,
-                JNI_FALSE);
-        CHECK_JNI_EXCEPTION(mainEnv)
-    }
-}
-
-void WindowContextBase::process_mouse_cross(XCrossingEvent* event) {
-    bool enter = event->type == EnterNotify;
-
-    if (jview) {
-        guint state = event->state;
-        if (enter) { // workaround for RT-21590
-            state &= ~MOUSE_BUTTONS_MASK;
-        }
-
-        if (enter != is_mouse_entered) {
-            is_mouse_entered = enter;
-            mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
-                    enter ? com_sun_glass_events_MouseEvent_ENTER : com_sun_glass_events_MouseEvent_EXIT,
-                    com_sun_glass_events_MouseEvent_BUTTON_NONE,
-                    (jint) event->x, (jint) event->y,
-                    (jint) event->x_root, (jint) event->y_root,
-                    xlib_modifier_mask_to_glass(state),
-                    JNI_FALSE,
-                    JNI_FALSE);
-            CHECK_JNI_EXCEPTION(mainEnv)
-        }
-    }
-}
-
-void WindowContextBase::process_key(XKeyEvent* event) {
-    bool press = event->type == KeyPress;
-
-    jint glassKey = get_glass_key(event);
-    jint glassModifier = xlib_modifier_mask_to_glass(event->state);
-    if (press) {
-        glassModifier |= glass_key_to_modifier(glassKey);
-    } else {
-        glassModifier &= ~glass_key_to_modifier(glassKey);
-    }
-
-    jcharArray jChars = NULL;
-    jchar key = 0;
-
-    KeySym keysym = XLookupKeysym(event, 0);
-
-    g_print("KEYSYM: %ld, %d\n", keysym, event->keycode);
-
-    if (keysym != NoSymbol) {
-        key = (jchar) keysym;
-
-        if (key >= 'a' && key <= 'z' && (event->state & ControlMask)) {
-            key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
-        } else {
-            switch (keysym) {
-                case 0xFF08 /* Backspace */: key =  '\b'; break;
-                case 0xFF09 /* Tab       */: key =  '\t'; break;
-                case 0xFF0A /* Linefeed  */: key =  '\n'; break;
-                case 0xFF0B /* Vert. Tab */: key =  '\v'; break;
-                case 0xFF0D /* Return    */: key =  '\r'; break;
-                case 0xFF1B /* Escape    */: key =  '\033'; break;
-                case 0xFFFF /* Delete    */: key =  '\177'; break;
-            }
-        }
-
-        if (key > 0) {
-            jChars = mainEnv->NewCharArray(1);
-            if (jChars) {
-                mainEnv->SetCharArrayRegion(jChars, 0, 1, &key);
-                CHECK_JNI_EXCEPTION(mainEnv)
-            }
-        } else {
-            jChars = mainEnv->NewCharArray(0);
-        }
-    }
-
-    if (jview) {
-        if (press) {
-            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-                    com_sun_glass_events_KeyEvent_PRESS,
-                    glassKey,
-                    jChars,
-                    glassModifier);
-            CHECK_JNI_EXCEPTION(mainEnv)
-
-            if (jview && key > 0) { // TYPED events should only be sent for printable characters.
-                mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-                        com_sun_glass_events_KeyEvent_TYPED,
-                        com_sun_glass_events_KeyEvent_VK_UNDEFINED,
-                        jChars,
-                        glassModifier);
-                CHECK_JNI_EXCEPTION(mainEnv)
-            }
-        } else {
-            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-                    com_sun_glass_events_KeyEvent_RELEASE,
-                    glassKey,
-                    jChars,
-                    glassModifier);
-            CHECK_JNI_EXCEPTION(mainEnv)
-        }
-    }
-}
-
-void WindowContextBase::paint(void* data, jint width, jint height) {
-    cairo_surface_t* x11_surface;
-    x11_surface = cairo_xlib_surface_create(display, xwindow, vinfo.visual, width, height);
-    cairo_surface_t* img_surface;
-    img_surface = cairo_image_surface_create_for_data((unsigned char*)data,
-                                                       CAIRO_FORMAT_ARGB32,
-                                                       width, height, width * 4);
-
-    cairo_t *context = cairo_create(x11_surface);
-
-    cairo_set_source_surface(context, img_surface, 0, 0);
-    cairo_set_operator(context, CAIRO_OPERATOR_SOURCE);
-    cairo_paint(context);
-    cairo_destroy(context);
-    cairo_surface_destroy(x11_surface);
-    cairo_surface_destroy(img_surface);
-
-    XFlush(display);
-}
-
-void WindowContextBase::add_child(WindowContextTop* child) {
-    children.insert(child);
-    XSetTransientForHint(display, child->get_window(), xwindow);
-}
-
-void WindowContextBase::remove_child(WindowContextTop* child) {
-    children.erase(child);
-    XSetTransientForHint(display, child->get_window(), None);
-}
-
-void WindowContextBase::show_or_hide_children(bool show) {
-    std::set<WindowContextTop*>::iterator it;
-    for (it = children.begin(); it != children.end(); ++it) {
-        (*it)->set_minimized(!show);
-        (*it)->show_or_hide_children(show);
-    }
-}
-
-void WindowContextBase::reparent_children(WindowContext* parent) {
-    std::set<WindowContextTop*>::iterator it;
-    for (it = children.begin(); it != children.end(); ++it) {
-        (*it)->set_owner(parent);
-        parent->add_child(*it);
-    }
-    children.clear();
-}
-
-void WindowContextBase::set_visible(bool visible) {
-    if (visible) {
-        XFlush(display);
-        g_print("XMapWindow\n");
-        XMapWindow(display, xwindow);
-    } else {
-        XUnmapWindow(display, xwindow);
-        if (jview && is_mouse_entered) {
-            is_mouse_entered = false;
-            mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
-                    com_sun_glass_events_MouseEvent_EXIT,
-                    com_sun_glass_events_MouseEvent_BUTTON_NONE,
-                    0, 0,
-                    0, 0,
-                    0,
-                    JNI_FALSE,
-                    JNI_FALSE);
-            CHECK_JNI_EXCEPTION(mainEnv)
-        }
-    }
-}
-
-bool WindowContextBase::is_visible() {
-    //VisibilityUnobscured, VisibilityPartiallyObscured, VisibilityFullyObscured
-    return (visibility_state == VisibilityUnobscured
-                || visibility_state == VisibilityPartiallyObscured);
-}
-
-bool WindowContextBase::set_view(jobject view) {
-
-    if (jview) {
-        mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
-                com_sun_glass_events_MouseEvent_EXIT,
-                com_sun_glass_events_MouseEvent_BUTTON_NONE,
-                0, 0,
-                0, 0,
-                0,
-                JNI_FALSE,
-                JNI_FALSE);
-        mainEnv->DeleteGlobalRef(jview);
-    }
-
-    if (view) {
-        jview = mainEnv->NewGlobalRef(view);
-    } else {
-        jview = NULL;
-    }
-    return TRUE;
-}
-
-bool WindowContextBase::grab_mouse_drag_focus() {
-//    if (glass_gdk_mouse_devices_grab_with_cursor(
-//            gdk_window, gdk_window_get_cursor(gdk_window), FALSE)) {
-//        WindowContextBase::sm_mouse_drag_window = this;
-//        return true;
-//    } else {
-//        return false;
-//    }
-return true;
-}
-
-void WindowContextBase::ungrab_mouse_drag_focus() {
-//    WindowContextBase::sm_mouse_drag_window = NULL;
-//    glass_gdk_mouse_devices_ungrab();
-//    if (WindowContextBase::sm_grab_window) {
-//        WindowContextBase::sm_grab_window->grab_focus();
-//    }
-}
-
-bool WindowContextBase::grab_focus() {
-//    if (WindowContextBase::sm_mouse_drag_window
-//            || glass_gdk_mouse_devices_grab(gdk_window)) {
-//        WindowContextBase::sm_grab_window = this;
-//        return true;
-//    } else {
-//        return false;
-//    }
-return true;
-}
-
-void WindowContextBase::ungrab_focus() {
-//    if (!WindowContextBase::sm_mouse_drag_window) {
-//        glass_gdk_mouse_devices_ungrab();
-//    }
-//    WindowContextBase::sm_grab_window = NULL;
-//
-//    if (jwindow) {
-//        mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocusUngrab);
-//        CHECK_JNI_EXCEPTION(mainEnv)
-//    }
-}
-
-void WindowContextBase::set_cursor(Cursor cursor) {
-//TODO: XChangeActivePointerGrab.
-//    if (!is_in_drag()) {
-//        if (WindowContextBase::sm_mouse_drag_window) {
-//            glass_gdk_mouse_devices_grab_with_cursor(
-//                    WindowContextBase::sm_mouse_drag_window->get_gdk_window(), cursor, FALSE);
-//        } else if (WindowContextBase::sm_grab_window) {
-//            glass_gdk_mouse_devices_grab_with_cursor(
-//                    WindowContextBase::sm_grab_window->get_gdk_window(), cursor, TRUE);
-//        }
-//    }
-    g_print("set_cursor: %ld\n", cursor);
-    XDefineCursor(display, xwindow, cursor);
-}
-
-void WindowContextBase::set_background(float r, float g, float b) {
-#ifdef GLASS_GTK3
-    GdkRGBA rgba = {0, 0, 0, 1.};
-    rgba.red = r;
-    rgba.green = g;
-    rgba.blue = b;
-//    gdk_window_set_background_rgba(gdk_window, &rgba);
-#else
-    GdkColor color;
-    color.red   = (guint16) (r * 65535);
-    color.green = (guint16) (g * 65535);
-    color.blue  = (guint16) (b * 65535);
-//    gtk_widget_modify_bg(gtk_widget, GTK_STATE_NORMAL, &color);
-#endif
-}
-
-WindowContextBase::~WindowContextBase() {
-    g_print("DESTRUCTION!\n");
-    if (xim.ic) {
-        XDestroyIC(xim.ic);
-        xim.ic = NULL;
-    }
-    if (xim.im) {
-        XCloseIM(xim.im);
-        xim.im = NULL;
-    }
-
-//    XUnmapWindow(display, xwindow);
-    XDestroyWindow(display, xwindow);
-}
-
-////////////////////////////// WindowContextTop /////////////////////////////////
-WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long _screen,
+WindowContext * WindowContext::sm_grab_window = NULL;
+WindowContext * WindowContext::sm_mouse_drag_window = NULL;
+
+////////////////////////////// WindowContext /////////////////////////////////
+WindowContext::WindowContext(jobject _jwindow, WindowContext* _owner, long _screen,
         WindowFrameType _frame_type, WindowType type, int wmf) :
-            WindowContextBase(),
+            events_processing_cnt(0),
             screen(_screen),
             frame_type(_frame_type),
             window_type(type),
             owner(_owner),
             geometry(),
+            can_be_deleted(false),
+            jview(NULL),
             resizable(),
             frame_extents_initialized(),
             map_received(false),
@@ -650,7 +61,6 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
             on_top(false),
             requested_bounds() {
     jwindow = mainEnv->NewGlobalRef(_jwindow);
-
 
     display = main_ctx->display;
     glong xvisualID = (glong)mainEnv->GetStaticLongField(jApplicationCls, jApplicationVisualID);
@@ -773,8 +183,616 @@ WindowContextTop::WindowContextTop(jobject _jwindow, WindowContext* _owner, long
 //    gdk_window_register_dnd(gdk_window);
 }
 
+Window WindowContext::get_window() {
+    return xwindow;
+}
+
+jobject WindowContext::get_jview() {
+    return jview;
+}
+
+jobject WindowContext::get_jwindow() {
+    return jwindow;
+}
+
+bool WindowContext::isEnabled() {
+    if (jwindow) {
+        bool result = (JNI_TRUE == mainEnv->CallBooleanMethod(jwindow, jWindowIsEnabled));
+        LOG_EXCEPTION(mainEnv)
+        return result;
+    } else {
+        return false;
+    }
+}
+
+void WindowContext::notify_state(jint glass_state) {
+    if (glass_state == com_sun_glass_events_WindowEvent_RESTORE) {
+//        if (jview) {
+//            mainEnv->CallVoidMethod(jview,
+//                    jViewNotifyRepaint, 0, 0,
+//                    geometry_get_content_width(&geometry),
+//                    geometry_get_content_height(&geometry));
+//            CHECK_JNI_EXCEPTION(mainEnv);
+//        }
+    }
+
+    if (jwindow) {
+       mainEnv->CallVoidMethod(jwindow,
+               jGtkWindowNotifyStateChanged,
+               glass_state);
+       CHECK_JNI_EXCEPTION(mainEnv);
+    }
+}
+
+void WindowContext::process_visibility(XVisibilityEvent* event) {
+    visibility_state = event->state;
+    g_print("Visibility %d\n", visibility_state);
+}
+
+void WindowContext::process_focus(XFocusChangeEvent* event) {
+    bool in = event->type == FocusIn;
+
+    if (!in && WindowContext::sm_mouse_drag_window == this) {
+        ungrab_mouse_drag_focus();
+    }
+    if (!in && WindowContext::sm_grab_window == this) {
+        ungrab_focus();
+    }
+
+    if (xim.enabled && xim.ic) {
+        if (in) {
+            XSetICFocus(xim.ic);
+        } else {
+            XUnsetICFocus(xim.ic);
+        }
+    }
+
+    if (jwindow) {
+        if (!in || isEnabled()) {
+            g_print("jWindowNotifyFocus\n");
+            mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus,
+                        in ? com_sun_glass_events_WindowEvent_FOCUS_GAINED : com_sun_glass_events_WindowEvent_FOCUS_LOST);
+            CHECK_JNI_EXCEPTION(mainEnv)
+        } else {
+            mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocusDisabled);
+            CHECK_JNI_EXCEPTION(mainEnv)
+        }
+    }
+}
+
+void WindowContext::increment_events_counter() {
+    ++events_processing_cnt;
+}
+
+void WindowContext::decrement_events_counter() {
+    --events_processing_cnt;
+}
+
+size_t WindowContext::get_events_count() {
+    return events_processing_cnt;
+}
+
+bool WindowContext::is_dead() {
+    return can_be_deleted;
+}
+
+void destroy_and_delete_ctx(WindowContext* ctx) {
+    if (ctx) {
+        g_print("process_destroy...\n");
+        ctx->process_destroy();
+
+        if (!ctx->get_events_count()) {
+            g_print("delete\n");
+            delete ctx;
+        }
+        // else: ctx will be deleted in EventsCounterHelper after completing
+        // an event processing
+    }
+}
+
+void WindowContext::process_destroy() {
+//    if (WindowContext::sm_mouse_drag_window == this) {
+//        ungrab_mouse_drag_focus();
+//    }
+//
+//    if (WindowContext::sm_grab_window == this) {
+//        ungrab_focus();
+//    }
+
+
+    g_print("WindowContext::process_destroy...\n");
+
+    if (owner) {
+        g_print("owner->remove_child\n");
+        owner->remove_child(this);
+    }
+
+    XDeleteContext(display, xwindow, main_ctx->data_context);
+
+    std::set<WindowContext*>::iterator it;
+    for (it = children.begin(); it != children.end(); ++it) {
+        XSetTransientForHint(display, (*it)->get_window(), None);
+        (*it)->set_owner(NULL);
+        destroy_and_delete_ctx(*it);
+    }
+    children.clear();
+
+    g_print("WindowContext::process_destroy 2...\n");
+
+    if (jwindow) {
+        mainEnv->CallVoidMethod(jwindow, jWindowNotifyDestroy);
+        EXCEPTION_OCCURED(mainEnv);
+    }
+
+    g_print("WindowContext::process_destroy 3...\n");
+
+    if (jview) {
+        mainEnv->DeleteGlobalRef(jview);
+        jview = NULL;
+    }
+
+    g_print("WindowContext::process_destroy 4...\n");
+
+    if (jwindow) {
+        mainEnv->DeleteGlobalRef(jwindow);
+        jwindow = NULL;
+    }
+
+    can_be_deleted = true;
+    g_print("WindowContext::process_destroy end...\n");
+
+}
+
+void WindowContext::process_delete() {
+    if (jwindow && isEnabled()) {
+        mainEnv->CallVoidMethod(jwindow, jWindowNotifyClose);
+        CHECK_JNI_EXCEPTION(mainEnv)
+    }
+}
+
+void WindowContext::process_expose(XExposeEvent* event) {
+    g_print("expose\n");
+    if (jview) {
+        g_print("jViewNotifyRepaint %d, %d, %d, %d\n", event->x, event->y, event->width, event->height);
+        mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->x, event->y, event->width, event->height);
+        CHECK_JNI_EXCEPTION(mainEnv)
+    }
+}
+
+void WindowContext::process_damage(XDamageNotifyEvent* event) {
+    g_print("damage\n");
+    if (jview) {
+        g_print("DAMAGE: jViewNotifyRepaint %d, %d, %d, %d\n", event->area.x, event->area.y, event->area.width, event->area.height);
+        mainEnv->CallVoidMethod(jview, jViewNotifyRepaint, event->area.x, event->area.y, event->area.width, event->area.height);
+        CHECK_JNI_EXCEPTION(mainEnv)
+    }
+}
+
+static inline jint xlib_button_number_to_mouse_button(guint button) {
+    switch (button) {
+        case 1:
+            return com_sun_glass_events_MouseEvent_BUTTON_LEFT;
+        case 2:
+            return com_sun_glass_events_MouseEvent_BUTTON_OTHER;
+        case 3:
+            return com_sun_glass_events_MouseEvent_BUTTON_RIGHT;
+        case 4:
+            return com_sun_glass_events_MouseEvent_BUTTON_FORWARD;
+        case 5:
+            return com_sun_glass_events_MouseEvent_BUTTON_BACK;
+        default:
+            // Other buttons are not supported by quantum and are not reported by other platforms
+            return com_sun_glass_events_MouseEvent_BUTTON_NONE;
+    }
+}
+
+void WindowContext::process_mouse_button(XButtonEvent *event) {
+    bool press = event->type == ButtonPress;
+    jint state = xlib_modifier_mask_to_glass(event->state);
+
+    int mask = 0;
+    switch (event->button) {
+        case 1:
+            mask = Button1Mask;
+            break;
+        case 2:
+            mask = Button2Mask;
+            break;
+        case 3:
+            mask = Button3Mask;
+            break;
+        case 4:
+            mask = Button4Mask;
+            break;
+        case 5:
+            mask = Button5Mask;
+            break;
+    }
+
+    if (press) {
+        state |= mask;
+    } else {
+        state &= ~mask;
+    }
+
+    g_print("Mouse button %d\n", event->button);
+    //scroll
+    if (event->button == 4 || event->button == 5) {
+        jdouble dx = 0;
+        jdouble dy = (event->button == 4) ? 1 : -1;
+
+        if (event->state & ShiftMask) {
+            jdouble t = dy;
+            dy = dx;
+            dx = t;
+        }
+/
+        if (jview) {
+            mainEnv->CallVoidMethod(jview, jViewNotifyScroll,
+                    (jint) event->x, (jint) event->y,
+                    (jint) event->x_root, (jint) event->y_root,
+                    dx, dy, state,
+                    (jint) 0, (jint) 0,
+                    (jint) 0, (jint) 0,
+                    (jdouble) 40.0, (jdouble) 40.0);
+            CHECK_JNI_EXCEPTION(mainEnv)
+        }
+
+        return;
+    }
+
+    jint button = xlib_button_number_to_mouse_button(event->button);
+
+    if (jview && button != com_sun_glass_events_MouseEvent_BUTTON_NONE) {
+        g_print("jViewNotifyMouse press=%d, btn=%d, x,y=%d,%d\n", press, button, event->x, event->y);
+        mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
+                press ? com_sun_glass_events_MouseEvent_DOWN : com_sun_glass_events_MouseEvent_UP,
+                button,
+                (jint) event->x, (jint) event->y,
+                (jint) event->x_root, (jint) event->y_root,
+                state,
+                (event->button == 3 && press) ? JNI_TRUE : JNI_FALSE,
+                JNI_FALSE);
+        CHECK_JNI_EXCEPTION(mainEnv)
+
+        if (jview && event->button == 3 && press) {
+            mainEnv->CallVoidMethod(jview, jViewNotifyMenu,
+                    (jint)event->x, (jint)event->y,
+                    (jint)event->x_root, (jint)event->y_root,
+                    JNI_FALSE);
+            CHECK_JNI_EXCEPTION(mainEnv)
+        }
+    }
+}
+
+void WindowContext::process_mouse_motion(XMotionEvent* event) {
+    jint glass_modifier = xlib_modifier_mask_to_glass(event->state);
+
+    jint isDrag = glass_modifier & (
+            com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_PRIMARY |
+            com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_MIDDLE |
+            com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_SECONDARY |
+            com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_BACK |
+            com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_FORWARD);
+    jint button = com_sun_glass_events_MouseEvent_BUTTON_NONE;
+
+    if (glass_modifier & com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_PRIMARY) {
+        button = com_sun_glass_events_MouseEvent_BUTTON_LEFT;
+    } else if (glass_modifier & com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_MIDDLE) {
+        button = com_sun_glass_events_MouseEvent_BUTTON_OTHER;
+    } else if (glass_modifier & com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_SECONDARY) {
+        button = com_sun_glass_events_MouseEvent_BUTTON_RIGHT;
+    } else if (glass_modifier & com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_BACK) {
+        button = com_sun_glass_events_MouseEvent_BUTTON_BACK;
+    } else if (glass_modifier & com_sun_glass_events_KeyEvent_MODIFIER_BUTTON_FORWARD) {
+        button = com_sun_glass_events_MouseEvent_BUTTON_FORWARD;
+    }
+
+//    g_print("Mouse motion %d, %d, %d, %d\n", event->x_root, event->y_root, event->x, event->y);
+    if (jview) {
+        mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
+                isDrag ? com_sun_glass_events_MouseEvent_DRAG : com_sun_glass_events_MouseEvent_MOVE,
+                button,
+                (jint) event->x, (jint) event->y,
+                (jint) event->x_root, (jint) event->y_root,
+                glass_modifier,
+                JNI_FALSE,
+                JNI_FALSE);
+        CHECK_JNI_EXCEPTION(mainEnv)
+    }
+}
+
+void WindowContext::process_mouse_cross(XCrossingEvent* event) {
+    bool enter = event->type == EnterNotify;
+
+    if (jview) {
+        guint state = event->state;
+        if (enter) { // workaround for RT-21590
+            state &= ~MOUSE_BUTTONS_MASK;
+        }
+
+        if (enter != is_mouse_entered) {
+            is_mouse_entered = enter;
+            mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
+                    enter ? com_sun_glass_events_MouseEvent_ENTER : com_sun_glass_events_MouseEvent_EXIT,
+                    com_sun_glass_events_MouseEvent_BUTTON_NONE,
+                    (jint) event->x, (jint) event->y,
+                    (jint) event->x_root, (jint) event->y_root,
+                    xlib_modifier_mask_to_glass(state),
+                    JNI_FALSE,
+                    JNI_FALSE);
+            CHECK_JNI_EXCEPTION(mainEnv)
+        }
+    }
+}
+
+void WindowContext::process_key(XKeyEvent* event) {
+    bool press = event->type == KeyPress;
+
+    jint glassKey = get_glass_key(event);
+    jint glassModifier = xlib_modifier_mask_to_glass(event->state);
+    if (press) {
+        glassModifier |= glass_key_to_modifier(glassKey);
+    } else {
+        glassModifier &= ~glass_key_to_modifier(glassKey);
+    }
+
+    jcharArray jChars = NULL;
+    jchar key = 0;
+
+    KeySym keysym = XLookupKeysym(event, 0);
+
+    g_print("KEYSYM: %ld, %d\n", keysym, event->keycode);
+
+    if (keysym != NoSymbol) {
+        key = (jchar) keysym;
+
+        if (key >= 'a' && key <= 'z' && (event->state & ControlMask)) {
+            key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
+        } else {
+            switch (keysym) {
+                case 0xFF08 /* Backspace */: key =  '\b'; break;
+                case 0xFF09 /* Tab       */: key =  '\t'; break;
+                case 0xFF0A /* Linefeed  */: key =  '\n'; break;
+                case 0xFF0B /* Vert. Tab */: key =  '\v'; break;
+                case 0xFF0D /* Return    */: key =  '\r'; break;
+                case 0xFF1B /* Escape    */: key =  '\033'; break;
+                case 0xFFFF /* Delete    */: key =  '\177'; break;
+            }
+        }
+
+        if (key > 0) {
+            jChars = mainEnv->NewCharArray(1);
+            if (jChars) {
+                mainEnv->SetCharArrayRegion(jChars, 0, 1, &key);
+                CHECK_JNI_EXCEPTION(mainEnv)
+            }
+        } else {
+            jChars = mainEnv->NewCharArray(0);
+        }
+    }
+
+    if (jview) {
+        if (press) {
+            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+                    com_sun_glass_events_KeyEvent_PRESS,
+                    glassKey,
+                    jChars,
+                    glassModifier);
+            CHECK_JNI_EXCEPTION(mainEnv)
+
+            if (jview && key > 0) { // TYPED events should only be sent for printable characters.
+                mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+                        com_sun_glass_events_KeyEvent_TYPED,
+                        com_sun_glass_events_KeyEvent_VK_UNDEFINED,
+                        jChars,
+                        glassModifier);
+                CHECK_JNI_EXCEPTION(mainEnv)
+            }
+        } else {
+            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+                    com_sun_glass_events_KeyEvent_RELEASE,
+                    glassKey,
+                    jChars,
+                    glassModifier);
+            CHECK_JNI_EXCEPTION(mainEnv)
+        }
+    }
+}
+
+void WindowContext::paint(void* data, jint width, jint height) {
+    g_print("paint\n");
+    cairo_surface_t* x11_surface;
+    x11_surface = cairo_xlib_surface_create(display, xwindow, vinfo.visual, width, height);
+    cairo_surface_t* img_surface;
+    img_surface = cairo_image_surface_create_for_data((unsigned char*)data,
+                                                       CAIRO_FORMAT_ARGB32,
+                                                       width, height, width * 4);
+
+    cairo_t *context = cairo_create(x11_surface);
+
+    cairo_set_source_surface(context, img_surface, 0, 0);
+    cairo_set_operator(context, CAIRO_OPERATOR_SOURCE);
+    cairo_paint(context);
+    cairo_destroy(context);
+    cairo_surface_destroy(x11_surface);
+    cairo_surface_destroy(img_surface);
+
+    XFlush(display);
+}
+
+void WindowContext::add_child(WindowContext* child) {
+    children.insert(child);
+    XSetTransientForHint(display, child->get_window(), xwindow);
+}
+
+void WindowContext::remove_child(WindowContext* child) {
+    children.erase(child);
+    XSetTransientForHint(display, child->get_window(), None);
+}
+
+void WindowContext::show_or_hide_children(bool show) {
+    std::set<WindowContext*>::iterator it;
+    for (it = children.begin(); it != children.end(); ++it) {
+        (*it)->set_minimized(!show);
+        (*it)->show_or_hide_children(show);
+    }
+}
+
+void WindowContext::reparent_children(WindowContext* parent) {
+    std::set<WindowContext*>::iterator it;
+    for (it = children.begin(); it != children.end(); ++it) {
+        (*it)->set_owner(parent);
+        parent->add_child(*it);
+    }
+    children.clear();
+}
+
+void WindowContext::set_visible(bool visible) {
+    if (visible) {
+        XFlush(display);
+        g_print("XMapWindow\n");
+        XMapWindow(display, xwindow);
+    } else {
+        XUnmapWindow(display, xwindow);
+        if (jview && is_mouse_entered) {
+            is_mouse_entered = false;
+            mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
+                    com_sun_glass_events_MouseEvent_EXIT,
+                    com_sun_glass_events_MouseEvent_BUTTON_NONE,
+                    0, 0,
+                    0, 0,
+                    0,
+                    JNI_FALSE,
+                    JNI_FALSE);
+            CHECK_JNI_EXCEPTION(mainEnv)
+        }
+    }
+}
+
+bool WindowContext::is_visible() {
+    return map_received && !is_iconified;
+
+    //VisibilityUnobscured, VisibilityPartiallyObscured, VisibilityFullyObscured
+//    return (visibility_state == VisibilityUnobscured
+//                || visibility_state == VisibilityPartiallyObscured);
+}
+
+bool WindowContext::set_view(jobject view) {
+    g_print("set_view\n");
+    if (jview) {
+        mainEnv->CallVoidMethod(jview, jViewNotifyMouse,
+                com_sun_glass_events_MouseEvent_EXIT,
+                com_sun_glass_events_MouseEvent_BUTTON_NONE,
+                0, 0,
+                0, 0,
+                0,
+                JNI_FALSE,
+                JNI_FALSE);
+        mainEnv->DeleteGlobalRef(jview);
+    }
+
+    if (view) {
+        g_print("view setted\n");
+        jview = mainEnv->NewGlobalRef(view);
+    } else {
+        jview = NULL;
+    }
+
+    return TRUE;
+}
+
+bool WindowContext::grab_mouse_drag_focus() {
+//    if (glass_gdk_mouse_devices_grab_with_cursor(
+//            gdk_window, gdk_window_get_cursor(gdk_window), FALSE)) {
+//        WindowContext::sm_mouse_drag_window = this;
+//        return true;
+//    } else {
+//        return false;
+//    }
+return true;
+}
+
+void WindowContext::ungrab_mouse_drag_focus() {
+//    WindowContext::sm_mouse_drag_window = NULL;
+//    glass_gdk_mouse_devices_ungrab();
+//    if (WindowContext::sm_grab_window) {
+//        WindowContext::sm_grab_window->grab_focus();
+//    }
+}
+
+bool WindowContext::grab_focus() {
+//    if (WindowContext::sm_mouse_drag_window
+//            || glass_gdk_mouse_devices_grab(gdk_window)) {
+//        WindowContext::sm_grab_window = this;
+//        return true;
+//    } else {
+//        return false;
+//    }
+return true;
+}
+
+void WindowContext::ungrab_focus() {
+//    if (!WindowContext::sm_mouse_drag_window) {
+//        glass_gdk_mouse_devices_ungrab();
+//    }
+//    WindowContext::sm_grab_window = NULL;
+//
+//    if (jwindow) {
+//        mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocusUngrab);
+//        CHECK_JNI_EXCEPTION(mainEnv)
+//    }
+}
+
+void WindowContext::set_cursor(Cursor cursor) {
+//TODO: XChangeActivePointerGrab.
+//    if (!is_in_drag()) {
+//        if (WindowContext::sm_mouse_drag_window) {
+//            glass_gdk_mouse_devices_grab_with_cursor(
+//                    WindowContext::sm_mouse_drag_window->get_gdk_window(), cursor, FALSE);
+//        } else if (WindowContext::sm_grab_window) {
+//            glass_gdk_mouse_devices_grab_with_cursor(
+//                    WindowContext::sm_grab_window->get_gdk_window(), cursor, TRUE);
+//        }
+//    }
+    g_print("set_cursor: %ld\n", cursor);
+    XDefineCursor(display, xwindow, cursor);
+}
+
+void WindowContext::set_background(float r, float g, float b) {
+#ifdef GLASS_GTK3
+    GdkRGBA rgba = {0, 0, 0, 1.};
+    rgba.red = r;
+    rgba.green = g;
+    rgba.blue = b;
+//    gdk_window_set_background_rgba(gdk_window, &rgba);
+#else
+    GdkColor color;
+    color.red   = (guint16) (r * 65535);
+    color.green = (guint16) (g * 65535);
+    color.blue  = (guint16) (b * 65535);
+//    gtk_widget_modify_bg(gtk_widget, GTK_STATE_NORMAL, &color);
+#endif
+}
+
+WindowContext::~WindowContext() {
+    g_print("DESTRUCTION!\n");
+    if (xim.ic) {
+        XDestroyIC(xim.ic);
+        xim.ic = NULL;
+    }
+    if (xim.im) {
+        XCloseIM(xim.im);
+        xim.im = NULL;
+    }
+
+//    XUnmapWindow(display, xwindow);
+    XDestroyWindow(display, xwindow);
+}
+
+
 // Applied to a temporary full screen window to prevent sending events to Java
-void WindowContextTop::detach_from_java() {
+void WindowContext::detach_from_java() {
     if (jview) {
         mainEnv->DeleteGlobalRef(jview);
         jview = NULL;
@@ -785,7 +803,7 @@ void WindowContextTop::detach_from_java() {
     }
 }
 
-void WindowContextTop::activate_window() {
+void WindowContext::activate_window() {
 //    Atom navAtom = XInternAtom(display, "_NET_ACTIVE_WINDOW", True);
 //    if (navAtom != None) {
 //        XClientMessageEvent clientMessage;
@@ -806,7 +824,7 @@ void WindowContextTop::activate_window() {
 //    }
 }
 
-//void WindowContextTop::request_frame_extents() {
+//void WindowContext::request_frame_extents() {
 //    if (frame_type != TITLED) {
 //        return;
 //    }
@@ -833,7 +851,7 @@ void WindowContextTop::activate_window() {
 //    XFlush(display);
 //}
 
-void WindowContextTop::update_frame_extents() {
+void WindowContext::update_frame_extents() {
     g_print("update_frame_extents()\n");
     Atom frame_extents_atom = XInternAtom(display, "_NET_FRAME_EXTENTS", True);
     bool changed = false;
@@ -945,7 +963,7 @@ static void geometry_set_window_y(WindowGeometry *windowGeometry, int value) {
     windowGeometry->refy = newValue;
 }
 
-void WindowContextTop::process_client_message(XClientMessageEvent* event) {
+void WindowContext::process_client_message(XClientMessageEvent* event) {
     g_print("process_client_message: %s\n", XGetAtomName(display, event->message_type));
 
     if (XInternAtom(display, "WM_PROTOCOLS", True) == event->message_type) {
@@ -965,7 +983,7 @@ void WindowContextTop::process_client_message(XClientMessageEvent* event) {
     }
 }
 
-void WindowContextTop::process_property(XPropertyEvent* event) {
+void WindowContext::process_property(XPropertyEvent* event) {
     g_print("process_property: %s\n", XGetAtomName(display, event->atom));
 
     //TODO: global?
@@ -1042,7 +1060,7 @@ void WindowContextTop::process_property(XPropertyEvent* event) {
     }
 }
 
-void WindowContextTop::process_configure(XConfigureEvent* event) {
+void WindowContext::process_configure(XConfigureEvent* event) {
     int x, y, w, h;
 
     if (frame_type == TITLED) {
@@ -1096,7 +1114,7 @@ void WindowContextTop::process_configure(XConfigureEvent* event) {
 //    }
 }
 
-void WindowContextTop::update_window_constraints() {
+void WindowContext::update_window_constraints() {
     g_print("update_window_constraints\n");
     XSizeHints* hints = XAllocSizeHints();
 
@@ -1142,24 +1160,13 @@ void WindowContextTop::update_window_constraints() {
     XFree(hints);
 }
 
-void WindowContextTop::set_resizable(bool res) {
+void WindowContext::set_resizable(bool res) {
     resizable.value = res;
     update_window_constraints();
 }
 
-void WindowContextTop::set_visible(bool visible) {
-    WindowContextBase::set_visible(visible);
-
-    //JDK-8220272 - fire event first because GDK_FOCUS_CHANGE is not always in order
-//    if (visible && jwindow && isEnabled()) {
-//        mainEnv->CallVoidMethod(jwindow, jWindowNotifyFocus, com_sun_glass_events_WindowEvent_FOCUS_GAINED);
-//        CHECK_JNI_EXCEPTION(mainEnv);
-//    }
-}
-
-void WindowContextTop::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h, int cw, int ch) {
+void WindowContext::set_bounds(int x, int y, bool xSet, bool ySet, int w, int h, int cw, int ch) {
     g_print("set_bounds: %d, %d, %d, %d, %d, %d\n", x, y, w, h, cw, ch);
-
 
     requested_bounds.width = w;
     requested_bounds.height = h;
@@ -1219,11 +1226,11 @@ void WindowContextTop::set_bounds(int x, int y, bool xSet, bool ySet, int w, int
     window_configure(&windowChanges, windowChangesMask);
 }
 
-void WindowContextTop::process_map() {
+void WindowContext::process_map() {
     map_received = true;
 }
 
-void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned int windowChangesMask) {
+void WindowContext::window_configure(XWindowChanges *windowChanges, unsigned int windowChangesMask) {
     if (windowChangesMask == 0) {
         return;
     }
@@ -1249,7 +1256,7 @@ void WindowContextTop::window_configure(XWindowChanges *windowChanges, unsigned 
     XFlush(display);
 }
 
-void WindowContextTop::set_minimized(bool minimize) {
+void WindowContext::set_minimized(bool minimize) {
     g_print("set_minimized %d\n", minimize);
     is_iconified = minimize;
 
@@ -1266,7 +1273,7 @@ void WindowContextTop::set_minimized(bool minimize) {
                     XInternAtom(display, "_NET_WM_STATE_HIDDEN", True), None);
 }
 
-void WindowContextTop::set_maximized(bool maximize) {
+void WindowContext::set_maximized(bool maximize) {
     g_print("set_maximized %d\n", maximize);
     is_maximized = maximize;
 
@@ -1275,7 +1282,7 @@ void WindowContextTop::set_maximized(bool maximize) {
                     XInternAtom(display, "_NET_WM_STATE_MAXIMIZED_HORZ", True));
 }
 
-void WindowContextTop::change_wm_state(bool add, Atom state1, Atom state2) {
+void WindowContext::change_wm_state(bool add, Atom state1, Atom state2) {
     g_print("change_wm_state\n");
     XClientMessageEvent xclient;
 
@@ -1294,20 +1301,20 @@ void WindowContextTop::change_wm_state(bool add, Atom state1, Atom state2) {
                 SubstructureRedirectMask | SubstructureNotifyMask, (XEvent *)&xclient);
 }
 
-void WindowContextTop::enter_fullscreen() {
+void WindowContext::enter_fullscreen() {
     change_wm_state(true, XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", True), None);
 }
 
-void WindowContextTop::exit_fullscreen() {
+void WindowContext::exit_fullscreen() {
     change_wm_state(false, XInternAtom(display, "_NET_WM_STATE_FULLSCREEN", True), None);
 }
 
-void WindowContextTop::request_focus() {
+void WindowContext::request_focus() {
     XRaiseWindow(display, xwindow);
  //   XSetInputFocus(display, xwindow, RevertToNone, CurrentTime);
 }
 
-void WindowContextTop::set_focusable(bool focusable) {
+void WindowContext::set_focusable(bool focusable) {
     g_print("set_focusable %d\n", focusable);
     XWMHints *hints = XAllocWMHints();
     hints->input = (focusable) ? True : False;
@@ -1317,7 +1324,7 @@ void WindowContextTop::set_focusable(bool focusable) {
     XFree(hints);
 }
 
-void WindowContextTop::set_title(const char* title) {
+void WindowContext::set_title(const char* title) {
     g_print("set_title\n");
 //    XSetWMName(display, xwindow, (XTextProperty *) title);
 
@@ -1327,7 +1334,7 @@ void WindowContextTop::set_title(const char* title) {
                    PropModeReplace, (unsigned char*) title, strlen(title));
 }
 
-void WindowContextTop::set_alpha(double alpha) {
+void WindowContext::set_alpha(double alpha) {
     double target_opacity;
     gulong cardinal;
 
@@ -1350,24 +1357,24 @@ void WindowContextTop::set_alpha(double alpha) {
     }
 }
 
-void WindowContextTop::set_enabled(bool enabled) {
+void WindowContext::set_enabled(bool enabled) {
     is_disabled = !enabled;
     update_window_constraints();
 }
 
-void WindowContextTop::set_minimum_size(int w, int h) {
+void WindowContext::set_minimum_size(int w, int h) {
     resizable.minw = (w <= 0) ? 1 : w;
     resizable.minh = (h <= 0) ? 1 : h;
     update_window_constraints();
 }
 
-void WindowContextTop::set_maximum_size(int w, int h) {
+void WindowContext::set_maximum_size(int w, int h) {
     resizable.maxw = w;
     resizable.maxh = h;
     update_window_constraints();
 }
 
-void WindowContextTop::set_icon(cairo_surface_t* img_surface) {
+void WindowContext::set_icon(cairo_surface_t* img_surface) {
     g_print("==> set icon ------------ \n");
     if (img_surface) {
         guchar *data = cairo_image_surface_get_data(img_surface);
@@ -1413,19 +1420,19 @@ void WindowContextTop::set_icon(cairo_surface_t* img_surface) {
     }
 }
 
-void WindowContextTop::restack(bool restack) {
+void WindowContext::restack(bool restack) {
 //    gdk_window_restack(gdk_window, NULL, restack ? TRUE : FALSE);
 }
 
-void WindowContextTop::set_modal(bool modal, WindowContext* parent) {
+void WindowContext::set_modal(bool modal, WindowContext* parent) {
     //Currently not used
 }
 
-WindowFrameExtents WindowContextTop::get_frame_extents() {
+WindowFrameExtents WindowContext::get_frame_extents() {
     return geometry.extents;
 }
 
-void WindowContextTop::set_gravity(float x, float y) {
+void WindowContext::set_gravity(float x, float y) {
     int oldX = geometry_get_window_x(&geometry);
     int oldY = geometry_get_window_y(&geometry);
     geometry.gravity_x = x;
@@ -1434,7 +1441,7 @@ void WindowContextTop::set_gravity(float x, float y) {
     geometry_set_window_y(&geometry, oldY);
 }
 
-void WindowContextTop::notify_on_top(bool top) {
+void WindowContext::notify_on_top(bool top) {
     // Do not report effective (i.e. native) values to the FX, only if the user sets it manually
     mainEnv->CallVoidMethod(jwindow,
             jWindowNotifyLevelChanged,
@@ -1442,7 +1449,7 @@ void WindowContextTop::notify_on_top(bool top) {
     CHECK_JNI_EXCEPTION(mainEnv);
 }
 
-void WindowContextTop::notify_window_resize() {
+void WindowContext::notify_window_resize() {
     int w = geometry_get_window_width(&geometry);
     int h = geometry_get_window_height(&geometry);
 
@@ -1469,7 +1476,7 @@ void WindowContextTop::notify_window_resize() {
     }
 }
 
-void WindowContextTop::notify_window_move() {
+void WindowContext::notify_window_move() {
     int x = geometry_get_window_x(&geometry);
     int y = geometry_get_window_y(&geometry);
 
@@ -1485,7 +1492,7 @@ void WindowContextTop::notify_window_move() {
     }
 }
 
-void WindowContextTop::set_level(int level) {
+void WindowContext::set_level(int level) {
     g_print("set_level %d\n", level);
     if (level == com_sun_glass_ui_Window_Level_NORMAL) {
         on_top = false;
@@ -1497,17 +1504,6 @@ void WindowContextTop::set_level(int level) {
     change_wm_state(on_top, XInternAtom(display, "_NET_WM_STATE_ABOVE", True), None);
 }
 
-void WindowContextTop::set_owner(WindowContext * owner_ctx) {
+void WindowContext::set_owner(WindowContext * owner_ctx) {
     owner = owner_ctx;
-}
-
-void WindowContextTop::process_destroy() {
-    g_print("WindowContextTop::process_destroy\n");
-    if (owner) {
-        g_print("owner->remove_child\n");
-        owner->remove_child(this);
-    }
-
-    XDeleteContext(display, xwindow, main_ctx->data_context);
-    WindowContextBase::process_destroy();
 }

@@ -30,12 +30,11 @@
 #include <cstring>
 #include <cstdlib>
 
-bool WindowContextBase::hasIME() {
+bool WindowContext::hasIME() {
     return xim.enabled;
 }
 
-
-bool WindowContextBase::im_filter_keypress(XKeyEvent* xevent) {
+bool WindowContext::im_filter_keypress(XKeyEvent* xevent) {
     static size_t buf_len = 12;
     static char *buffer = NULL;
 
@@ -91,7 +90,7 @@ bool WindowContextBase::im_filter_keypress(XKeyEvent* xevent) {
     return TRUE;
 }
 
-bool WindowContextBase::filterIME(XEvent* xevent) {
+bool WindowContext::filterIME(XEvent* xevent) {
     if (!hasIME()) {
         return false;
     }
@@ -204,7 +203,7 @@ static XIMStyle get_best_supported_style(XIM im_xim)
     return result;
 }
 
-void WindowContextBase::enableOrResetIME() {
+void WindowContext::enableOrResetIME() {
     if (xim.im == NULL || xim.ic == NULL) {
         xim.im = XOpenIM(display, NULL, NULL, NULL);
         if (xim.im == NULL) {
@@ -251,7 +250,7 @@ void WindowContextBase::enableOrResetIME() {
     xim.enabled = TRUE;
 }
 
-void WindowContextBase::disableIME() {
+void WindowContext::disableIME() {
     if (xim.ic != NULL) {
         XUnsetICFocus(xim.ic);
     }

@@ -228,6 +228,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                     ctx->process_client_message(&xevent.xclient);
                     break;
                 default:
+                    g_print("Xevent Type: %d\n", xevent.type);
                     XFilterEvent(&xevent, None);
             }
         } catch (jni_exception&) {
