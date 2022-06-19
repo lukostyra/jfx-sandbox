@@ -89,8 +89,9 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext* _owner, long _scre
         //TODO: may not match
     }
 
+    colormap = XCreateColormap(display, DefaultRootWindow(display), vinfo.visual, AllocNone);
     XSetWindowAttributes attr;
-    attr.colormap = XCreateColormap(display, DefaultRootWindow(display), vinfo.visual, AllocNone);
+    attr.colormap = colormap;
     attr.border_pixel = 0;
     attr.background_pixel = (frame_type == TRANSPARENT)
                                 ? 0
@@ -426,7 +427,7 @@ void WindowContext::process_mouse_button(XButtonEvent *event) {
             dy = dx;
             dx = t;
         }
-/
+
         if (jview) {
             mainEnv->CallVoidMethod(jview, jViewNotifyScroll,
                     (jint) event->x, (jint) event->y,
@@ -602,6 +603,8 @@ void WindowContext::process_key(XKeyEvent* event) {
 
 void WindowContext::paint(void* data, jint width, jint height) {
     g_print("paint\n");
+//    XClearWindow(display, xwindow);
+
     cairo_surface_t* x11_surface;
     x11_surface = cairo_xlib_surface_create(display, xwindow, vinfo.visual, width, height);
     cairo_surface_t* img_surface;
@@ -671,7 +674,8 @@ void WindowContext::set_visible(bool visible) {
 }
 
 bool WindowContext::is_visible() {
-    return map_received && !is_iconified;
+    return true;
+    // map_received && !is_iconified;
 
     //VisibilityUnobscured, VisibilityPartiallyObscured, VisibilityFullyObscured
 //    return (visibility_state == VisibilityUnobscured
@@ -760,19 +764,12 @@ void WindowContext::set_cursor(Cursor cursor) {
 }
 
 void WindowContext::set_background(float r, float g, float b) {
-#ifdef GLASS_GTK3
-    GdkRGBA rgba = {0, 0, 0, 1.};
-    rgba.red = r;
-    rgba.green = g;
-    rgba.blue = b;
-//    gdk_window_set_background_rgba(gdk_window, &rgba);
-#else
-    GdkColor color;
+    XColor color;
     color.red   = (guint16) (r * 65535);
     color.green = (guint16) (g * 65535);
     color.blue  = (guint16) (b * 65535);
-//    gtk_widget_modify_bg(gtk_widget, GTK_STATE_NORMAL, &color);
-#endif
+    XAllocColor(display, colormap, &color);
+    XSetWindowBackground(display, xwindow, color.pixel);
 }
 
 WindowContext::~WindowContext() {
@@ -786,8 +783,8 @@ WindowContext::~WindowContext() {
         xim.im = NULL;
     }
 
-//    XUnmapWindow(display, xwindow);
     XDestroyWindow(display, xwindow);
+    XFreeColormap(display, colormap);
 }
 
 

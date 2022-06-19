@@ -153,6 +153,7 @@ private:
     jobject jview;
     Window xwindow;
     Window xparent;
+    Colormap colormap;
     Display* display;
     XVisualInfo vinfo;
 
