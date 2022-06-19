@@ -161,7 +161,7 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext* _owner, long _scre
     }
 
     if (owner) {
-        owner->add_child(this);
+        XSetTransientForHint(display, xwindow, owner->get_window());
     }
 
     MwmHints hints;
@@ -298,21 +298,23 @@ void WindowContext::process_destroy() {
 
     g_print("WindowContext::process_destroy...\n");
 
-    if (owner) {
-        g_print("owner->remove_child\n");
-        owner->remove_child(this);
+    Window root, parent;
+    Window *children;
+    guint nchildren_return;
+    XQueryTree(display, xwindow, &root, &parent, &children, &nchildren_return);
+    if (nchildren_return > 0) {
+        for (int i = 0; i < nchildren_return; i++) {
+            XSetTransientForHint(display, children[i], None);
+            WindowContext *ctx;
+            if (XFindContext(display, xwindow, main_ctx->data_context, (XPointer *) &ctx) != 0) {
+                ctx->set_owner(NULL);
+                destroy_and_delete_ctx(ctx);
+            }
+        }
+        XFree(children);
     }
 
     XDeleteContext(display, xwindow, main_ctx->data_context);
-
-    std::set<WindowContext*>::iterator it;
-    for (it = children.begin(); it != children.end(); ++it) {
-        XSetTransientForHint(display, (*it)->get_window(), None);
-        (*it)->set_owner(NULL);
-        destroy_and_delete_ctx(*it);
-    }
-    children.clear();
-
     g_print("WindowContext::process_destroy 2...\n");
 
     if (jwindow) {
@@ -598,8 +600,6 @@ void WindowContext::process_key(XKeyEvent* event) {
 
 void WindowContext::paint(void* data, jint width, jint height) {
     g_print("paint\n");
-//    XClearWindow(display, xwindow);
-
     cairo_surface_t* x11_surface;
     x11_surface = cairo_xlib_surface_create(display, xwindow, vinfo.visual, width, height);
     cairo_surface_t* img_surface;
@@ -619,31 +619,31 @@ void WindowContext::paint(void* data, jint width, jint height) {
     XFlush(display);
 }
 
-void WindowContext::add_child(WindowContext* child) {
-    children.insert(child);
-    XSetTransientForHint(display, child->get_window(), xwindow);
-}
-
-void WindowContext::remove_child(WindowContext* child) {
-    children.erase(child);
-    XSetTransientForHint(display, child->get_window(), None);
-}
-
 void WindowContext::show_or_hide_children(bool show) {
-    std::set<WindowContext*>::iterator it;
-    for (it = children.begin(); it != children.end(); ++it) {
-        (*it)->set_minimized(!show);
-        (*it)->show_or_hide_children(show);
+    Window root, parent;
+    Window *children;
+    guint nchildren_return;
+    XQueryTree(display, xwindow, &root, &parent, &children, &nchildren_return);
+    if (nchildren_return > 0) {
+        for (int i = 0; i < nchildren_return; i++) {
+            WindowContext *ctx;
+            if (XFindContext(display, xwindow, main_ctx->data_context, (XPointer *) &ctx) != 0) {
+                ctx->set_minimized(!show);
+                ctx->show_or_hide_children(show);
+            }
+        }
+        XFree(children);
     }
 }
 
 void WindowContext::reparent_children(WindowContext* parent) {
-    std::set<WindowContext*>::iterator it;
-    for (it = children.begin(); it != children.end(); ++it) {
-        (*it)->set_owner(parent);
-        parent->add_child(*it);
-    }
-    children.clear();
+//TODO
+//    std::set<WindowContext*>::iterator it;
+//    for (it = children.begin(); it != children.end(); ++it) {
+//        (*it)->set_owner(parent);
+//        parent->add_child(*it);
+//    }
+//    children.clear();
 }
 
 void WindowContext::set_visible(bool visible) {

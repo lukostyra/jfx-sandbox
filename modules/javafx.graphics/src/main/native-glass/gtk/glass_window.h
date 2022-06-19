@@ -148,7 +148,6 @@ private:
     WindowGeometry geometry;
 
     bool can_be_deleted;
-    std::set<WindowContext*> children;
     jobject jwindow;
     jobject jview;
     Window xwindow;
@@ -225,8 +224,6 @@ public:
     jobject get_jwindow();
     jobject get_jview();
 
-    void add_child(WindowContext*);
-    void remove_child(WindowContext*);
     void show_or_hide_children(bool);
     void reparent_children(WindowContext* parent);
     void set_visible(bool);
