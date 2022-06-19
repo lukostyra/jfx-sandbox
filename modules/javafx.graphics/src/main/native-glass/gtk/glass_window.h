@@ -157,7 +157,6 @@ private:
     Display* display;
     XVisualInfo vinfo;
 
-    int visibility_state;
     bool is_iconified;
     bool is_maximized;
     bool is_mouse_entered;
@@ -248,7 +247,6 @@ public:
     void process_mouse_motion(XMotionEvent*);
     void process_mouse_cross(XCrossingEvent*);
     void process_key(XKeyEvent*);
-    void process_visibility(XVisibilityEvent*);
     void process_map();
     void process_property(XPropertyEvent*);
     void process_client_message(XClientMessageEvent*);

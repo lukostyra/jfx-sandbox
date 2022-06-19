@@ -225,11 +225,6 @@ void WindowContext::notify_state(jint glass_state) {
     }
 }
 
-void WindowContext::process_visibility(XVisibilityEvent* event) {
-    visibility_state = event->state;
-    g_print("Visibility %d\n", visibility_state);
-}
-
 void WindowContext::process_focus(XFocusChangeEvent* event) {
     bool in = event->type == FocusIn;
 
@@ -676,10 +671,6 @@ void WindowContext::set_visible(bool visible) {
 bool WindowContext::is_visible() {
     return true;
     // map_received && !is_iconified;
-
-    //VisibilityUnobscured, VisibilityPartiallyObscured, VisibilityFullyObscured
-//    return (visibility_state == VisibilityUnobscured
-//                || visibility_state == VisibilityPartiallyObscured);
 }
 
 bool WindowContext::set_view(jobject view) {

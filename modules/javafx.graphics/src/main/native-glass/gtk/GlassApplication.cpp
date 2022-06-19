@@ -187,9 +187,6 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
         EventsCounterHelper helper(ctx);
         try {
             switch (xevent.type) {
-                case VisibilityNotify:
-                    ctx->process_visibility(&xevent.xvisibility);
-                    break;
                 case ConfigureNotify:
                     ctx->process_configure(&xevent.xconfigure);
                     break;
