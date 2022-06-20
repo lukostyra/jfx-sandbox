@@ -26,6 +26,7 @@
 #include <X11/extensions/Xdamage.h>
 #include <X11/extensions/Xrandr.h>
 #include <X11/extensions/Xcomposite.h>
+#include <X11/extensions/XInput2.h>
 #include <X11/extensions/sync.h>
 #include <X11/XKBlib.h>
 #include <X11/Xresource.h>
@@ -151,6 +152,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
 
     Display *display = main_ctx->display;
     WindowContext* ctx;
+    XGenericEventCookie cookie;
 
     while (XPending(display)) {
         XNextEvent(display, &xevent);
@@ -185,6 +187,27 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
         }
 
         EventsCounterHelper helper(ctx);
+
+        //XInput events
+        cookie = xevent.xcookie;
+
+        if (xevent.type == GenericEvent && cookie.extension == main_ctx->xi_opcode) {
+            XIEvent* xi_ev;
+            g_print("XINPUT Event\n");
+
+            xi_ev = (XIEvent *) cookie.data;
+
+            switch(xi_ev->evtype) {
+                case XI_KeyPress:
+                case XI_KeyRelease:
+                    g_print("XI Key event\n");
+                    break;
+            }
+
+            continue;
+        }
+
+
         try {
             switch (xevent.type) {
                 case ConfigureNotify:
@@ -270,7 +293,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
     if (XSyncQueryExtension(display, &main_ctx->xsync_event_base, &ignore)) {
         XSyncInitialize(display, &major, &minor);
     }
-    
+
     XDamageQueryExtension(display, &main_ctx->xdamage_event_base, &ignore);
 
     gint xkb_major = XkbMajorVersion;
@@ -297,6 +320,11 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
             XkbSetDetectableAutoRepeat(display, True, &detectable_autorepeat_supported);
 //        TODO: handle those events
         }
+    }
+
+    int firsterror;
+    if (XQueryExtension(display, "XInputExtension", &main_ctx->xi_opcode, &main_ctx->xi_event_base, &firsterror)) {
+        g_print("--------------------------------> XINPUT --------------------------------------------\n");
     }
 
     //TODO: can get setting change notification

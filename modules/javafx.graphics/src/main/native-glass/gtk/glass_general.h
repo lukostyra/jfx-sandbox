@@ -134,6 +134,8 @@ private:
         int randr_event_base;
         int xsync_event_base;
         int xdamage_event_base;
+        int xi_event_base;
+        int xi_opcode;
         int xkb_event_type;
         int data_context;
         XSettingsClient *settings_client;
