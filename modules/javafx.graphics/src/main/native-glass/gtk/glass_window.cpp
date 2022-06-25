@@ -177,11 +177,39 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext* _owner, long _scre
     XChangeProperty(display, xwindow, motif_atom, motif_atom, 32,
                     PropModeReplace, (unsigned char *)&hints, sizeof (MwmHints)/sizeof (long));
 
+    enable_xinput_events();
     XFlush(display);
 
 //    request_frame_extents();
 
 //    gdk_window_register_dnd(gdk_window);
+}
+
+void WindowContext::enable_xinput_events() {
+
+    XIEventMask event_mask;
+    unsigned char mask[4] = { 0 };
+
+    XISetMask(mask, XI_ButtonPress);
+    XISetMask(mask, XI_ButtonRelease);
+    XISetMask(mask, XI_KeyPress);
+    XISetMask(mask, XI_KeyRelease);
+//    XISetMask(mask, XI_Motion);
+//    XISetMask(mask, XI_DeviceChanged);
+//    XISetMask(mask, XI_Enter);
+//    XISetMask(mask, XI_Leave);
+//    XISetMask(mask, XI_FocusIn);
+//    XISetMask(mask, XI_FocusOut);
+//    XISetMask(mask, XI_TouchBegin);
+//    XISetMask(mask, XI_TouchUpdate);
+//    XISetMask(mask, XI_HierarchyChanged);
+//    XISetMask(mask, XI_DeviceChanged);
+//    XISetMask(mask, XI_PropertyEvent);
+    event_mask.deviceid = XIAllDevices;
+    event_mask.mask_len = sizeof(mask);
+    event_mask.mask = mask;
+
+    XISelectEvents(display, xwindow, &event_mask, 1);
 }
 
 Window WindowContext::get_window() {
@@ -648,10 +676,10 @@ void WindowContext::reparent_children(WindowContext* parent) {
 
 void WindowContext::set_visible(bool visible) {
     if (visible) {
-        XFlush(display);
+//        XFlush(display);
         g_print("XMapWindow\n");
         XMapWindow(display, xwindow);
-    } else {
+   } else {
         XUnmapWindow(display, xwindow);
         if (jview && is_mouse_entered) {
             is_mouse_entered = false;

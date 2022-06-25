@@ -152,12 +152,31 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
 
     Display *display = main_ctx->display;
     WindowContext* ctx;
-    XGenericEventCookie cookie;
 
     while (XPending(display)) {
         XNextEvent(display, &xevent);
 
         if (xsettings_client_process_event(main_ctx->settings_client, &xevent)) {
+            continue;
+        }
+
+        //XInput events
+        if (XGetEventData(display, &xevent.xcookie)
+            && xevent.xcookie.type == GenericEvent
+            && xevent.xcookie.extension == main_ctx->xi_opcode) {
+            XIEvent* xi_ev;
+            g_print("XINPUT Event\n");
+
+            xi_ev = (XIEvent *) xevent.xcookie.data;
+
+            switch(xi_ev->evtype) {
+                case XI_KeyPress:
+                case XI_KeyRelease:
+                    g_print("XI Key event\n");
+                    break;
+            }
+
+            XFreeEventData(display, &xevent.xcookie);
             continue;
         }
 
@@ -187,26 +206,6 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
         }
 
         EventsCounterHelper helper(ctx);
-
-        //XInput events
-        cookie = xevent.xcookie;
-
-        if (xevent.type == GenericEvent && cookie.extension == main_ctx->xi_opcode) {
-            XIEvent* xi_ev;
-            g_print("XINPUT Event\n");
-
-            xi_ev = (XIEvent *) cookie.data;
-
-            switch(xi_ev->evtype) {
-                case XI_KeyPress:
-                case XI_KeyRelease:
-                    g_print("XI Key event\n");
-                    break;
-            }
-
-            continue;
-        }
-
 
         try {
             switch (xevent.type) {

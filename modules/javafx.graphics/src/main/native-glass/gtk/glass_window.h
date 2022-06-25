@@ -30,6 +30,7 @@
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/Xdamage.h>
+#include <X11/extensions/XInput2.h>
 #include <X11/extensions/shape.h>
 #include <cairo/cairo-xlib.h>
 #include <glib.h>
@@ -289,6 +290,7 @@ public:
 
     ~WindowContext();
 private:
+    void enable_xinput_events();
     bool im_filter_keypress(XKeyEvent*);
     bool get_frame_extents_property(int *, int *, int *, int *);
     void activate_window();
