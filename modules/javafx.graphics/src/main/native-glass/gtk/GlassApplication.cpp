@@ -84,6 +84,13 @@ static gboolean x11_event_source_prepare(GSource* source, gint* timeout);
 static gboolean x11_event_source_check(GSource* source);
 static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback, gpointer user_data);
 
+static int x_error_trap(Display     *display,
+						XErrorEvent *error) {
+	g_print("==========> X ERROR %d\n", error->error_code);
+
+	return 0;
+}
+
 static GSourceFuncs x11_event_funcs = {
     x11_event_source_prepare,
     x11_event_source_check,
@@ -160,6 +167,27 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             continue;
         }
 
+        if (xevent.xany.window == DefaultRootWindow(display)) {
+            g_print("============> Root Window Event %d\n", xevent.type);
+
+            if (main_ctx->randr_event_base + RRScreenChangeNotify == xevent.type) {
+                g_print("============> UPDATE SCREENS %d\n", xevent.type);
+                mainEnv->CallStaticVoidMethod(jScreenCls, jScreenNotifySettingsChanged);
+                LOG_EXCEPTION(mainEnv);
+            }
+
+            continue;
+        }
+
+        if (ctx->hasIME() && ctx->filterIME(&xevent)) {
+            continue;
+        }
+
+        if (XFindContext(display, xevent.xany.window, main_ctx->data_context, (XPointer *) &ctx) != 0) {
+//            g_print("CTX not found: %d, win: %ld\n", main_ctx->data_context, xevent.xany.window);
+            continue;
+        }
+
         //XInput events
         if (XGetEventData(display, &xevent.xcookie)
             && xevent.xcookie.type == GenericEvent
@@ -177,31 +205,6 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             }
 
             XFreeEventData(display, &xevent.xcookie);
-            continue;
-        }
-
-        if (xevent.xany.window == DefaultRootWindow(display)) {
-            g_print("============> Root Window Event %d\n", xevent.type);
-
-            if (main_ctx->randr_event_base + RRScreenChangeNotify == xevent.type) {
-                g_print("============> UPDATE SCREENS %d\n", xevent.type);
-                mainEnv->CallStaticVoidMethod(jScreenCls, jScreenNotifySettingsChanged);
-                LOG_EXCEPTION(mainEnv);
-            }
-
-            continue;
-        }
-
-        if (XFindContext(display, xevent.xany.window, main_ctx->data_context, (XPointer *) &ctx) != 0) {
-            //g_print("CTX not found: %d, win: %ld\n", X_CONTEXT, xevent.xany.window);
-            continue;
-        }
-
-        if (ctx == NULL) {
-            continue;
-        }
-
-        if (ctx->hasIME() && ctx->filterIME(&xevent)) {
             continue;
         }
 
@@ -329,6 +332,7 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
     //TODO: can get setting change notification
     main_ctx->settings_client = xsettings_client_new(display, DefaultScreen(display), setting_notify_cb, NULL, NULL);
 
+    XSetErrorHandler(x_error_trap);
     x11_monitor_events(source);
 
     return JNI_TRUE;

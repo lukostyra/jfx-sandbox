@@ -1327,7 +1327,7 @@ void WindowContext::exit_fullscreen() {
 
 void WindowContext::request_focus() {
     XRaiseWindow(display, xwindow);
- //   XSetInputFocus(display, xwindow, RevertToNone, CurrentTime);
+//    XSetInputFocus(display, xwindow, RevertToNone, CurrentTime);
 }
 
 void WindowContext::set_focusable(bool focusable) {
