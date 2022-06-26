@@ -293,7 +293,6 @@ private:
     void enable_xinput_events();
     bool im_filter_keypress(XKeyEvent*);
     bool get_frame_extents_property(int *, int *, int *, int *);
-    void activate_window();
     void update_frame_extents();
 //    void request_frame_extents();
     void window_configure(XWindowChanges *, unsigned int);

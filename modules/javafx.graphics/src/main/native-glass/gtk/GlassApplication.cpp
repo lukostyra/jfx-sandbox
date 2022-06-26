@@ -179,9 +179,9 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             continue;
         }
 
-        if (ctx->hasIME() && ctx->filterIME(&xevent)) {
-            continue;
-        }
+//        if (ctx->hasIME() && ctx->filterIME(&xevent)) {
+//            continue;
+//        }
 
         if (XFindContext(display, xevent.xany.window, main_ctx->data_context, (XPointer *) &ctx) != 0) {
 //            g_print("CTX not found: %d, win: %ld\n", main_ctx->data_context, xevent.xany.window);

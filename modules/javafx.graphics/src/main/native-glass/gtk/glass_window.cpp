@@ -188,10 +188,10 @@ WindowContext::WindowContext(jobject _jwindow, WindowContext* _owner, long _scre
 void WindowContext::enable_xinput_events() {
 
     XIEventMask event_mask;
-    unsigned char mask[4] = { 0 };
+    unsigned char mask[2] = { 0 };
 
-    XISetMask(mask, XI_ButtonPress);
-    XISetMask(mask, XI_ButtonRelease);
+//    XISetMask(mask, XI_ButtonPress);
+//    XISetMask(mask, XI_ButtonRelease);
     XISetMask(mask, XI_KeyPress);
     XISetMask(mask, XI_KeyRelease);
 //    XISetMask(mask, XI_Motion);
@@ -819,27 +819,6 @@ void WindowContext::detach_from_java() {
     }
 }
 
-void WindowContext::activate_window() {
-//    Atom navAtom = XInternAtom(display, "_NET_ACTIVE_WINDOW", True);
-//    if (navAtom != None) {
-//        XClientMessageEvent clientMessage;
-//        memset(&clientMessage, 0, sizeof(clientMessage));
-//
-//        clientMessage.type = ClientMessage;
-//        clientMessage.window = GDK_WINDOW_XID(gdk_window);
-//        clientMessage.message_type = navAtom;
-//        clientMessage.format = 32;
-//        clientMessage.data.l[0] = 1;
-//        clientMessage.data.l[1] = gdk_x11_get_server_time(gdk_window);
-//        clientMessage.data.l[2] = 0;
-//
-//        XSendEvent(display, DefaultRootWindow(display), False,
-//                   SubstructureRedirectMask | SubstructureNotifyMask,
-//                   (XEvent *) &clientMessage);
-//        XFlush(display);
-//    }
-}
-
 //void WindowContext::request_frame_extents() {
 //    if (frame_type != TITLED) {
 //        return;
@@ -992,7 +971,6 @@ void WindowContext::process_client_message(XClientMessageEvent* event) {
                       SubstructureRedirectMask | SubstructureNotifyMask, (XEvent *) event);
             XFlush(display);
         } else if (XInternAtom(display, "WM_TAKE_FOCUS", True) == atom) {
-            XSetInputFocus(display, xwindow, RevertToParent, event->data.l[1]);
         } else if (XInternAtom(display, "WM_DELETE_WINDOW", True) == atom) {
             destroy_and_delete_ctx(this);
         }
@@ -1326,7 +1304,26 @@ void WindowContext::exit_fullscreen() {
 }
 
 void WindowContext::request_focus() {
-    XRaiseWindow(display, xwindow);
+    g_print("request_focus\n");
+    Atom navAtom = XInternAtom(display, "_NET_ACTIVE_WINDOW", True);
+    XClientMessageEvent clientMessage;
+    memset(&clientMessage, 0, sizeof(clientMessage));
+
+    clientMessage.type = ClientMessage;
+    clientMessage.window = xwindow;
+    clientMessage.message_type = navAtom;
+    clientMessage.format = 32;
+    clientMessage.data.l[0] = 1;
+    clientMessage.data.l[1] = CurrentTime;
+    clientMessage.data.l[2] = None;
+
+    XSendEvent(display, DefaultRootWindow(display), False,
+               SubstructureRedirectMask | SubstructureNotifyMask,
+               (XEvent *) &clientMessage);
+    XFlush(display);
+
+    //TODO: wm may not support activate
+//    XRaiseWindow(display, xwindow);
 //    XSetInputFocus(display, xwindow, RevertToNone, CurrentTime);
 }
 
