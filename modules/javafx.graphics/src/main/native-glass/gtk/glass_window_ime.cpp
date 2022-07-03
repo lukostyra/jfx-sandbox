@@ -50,7 +50,7 @@ bool WindowContext::im_filter_keypress(XKeyEvent* xevent) {
     }
 
     if (xevent->type == KeyRelease) {
-        process_key(xevent);
+//        process_key(xevent);
         return TRUE;
     }
 
@@ -66,7 +66,7 @@ bool WindowContext::im_filter_keypress(XKeyEvent* xevent) {
         case XLookupBoth:
             if (xevent->keycode) {
                 //process it as a normal key
-                process_key(xevent);
+//                process_key(xevent);
                 break;
             }
             // fall-through

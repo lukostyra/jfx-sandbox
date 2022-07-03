@@ -552,78 +552,80 @@ void WindowContext::process_mouse_cross(XCrossingEvent* event) {
     }
 }
 
-void WindowContext::process_key(XKeyEvent* event) {
-    bool press = event->type == KeyPress;
+void WindowContext::process_key(XIDeviceEvent* event) {
+    g_print("process_key\n");
+    bool press = event->evtype == XI_KeyPress;
 
-    jint glassKey = get_glass_key(event);
-    jint glassModifier = xlib_modifier_mask_to_glass(event->state);
-    if (press) {
-        glassModifier |= glass_key_to_modifier(glassKey);
-    } else {
-        glassModifier &= ~glass_key_to_modifier(glassKey);
-    }
 
-    jcharArray jChars = NULL;
-    jchar key = 0;
-
-    KeySym keysym = XLookupKeysym(event, 0);
-
-    g_print("KEYSYM: %ld, %d\n", keysym, event->keycode);
-
-    if (keysym != NoSymbol) {
-        key = (jchar) keysym;
-
-        if (key >= 'a' && key <= 'z' && (event->state & ControlMask)) {
-            key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
-        } else {
-            switch (keysym) {
-                case 0xFF08 /* Backspace */: key =  '\b'; break;
-                case 0xFF09 /* Tab       */: key =  '\t'; break;
-                case 0xFF0A /* Linefeed  */: key =  '\n'; break;
-                case 0xFF0B /* Vert. Tab */: key =  '\v'; break;
-                case 0xFF0D /* Return    */: key =  '\r'; break;
-                case 0xFF1B /* Escape    */: key =  '\033'; break;
-                case 0xFFFF /* Delete    */: key =  '\177'; break;
-            }
-        }
-
-        if (key > 0) {
-            jChars = mainEnv->NewCharArray(1);
-            if (jChars) {
-                mainEnv->SetCharArrayRegion(jChars, 0, 1, &key);
-                CHECK_JNI_EXCEPTION(mainEnv)
-            }
-        } else {
-            jChars = mainEnv->NewCharArray(0);
-        }
-    }
-
-    if (jview) {
-        if (press) {
-            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-                    com_sun_glass_events_KeyEvent_PRESS,
-                    glassKey,
-                    jChars,
-                    glassModifier);
-            CHECK_JNI_EXCEPTION(mainEnv)
-
-            if (jview && key > 0) { // TYPED events should only be sent for printable characters.
-                mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-                        com_sun_glass_events_KeyEvent_TYPED,
-                        com_sun_glass_events_KeyEvent_VK_UNDEFINED,
-                        jChars,
-                        glassModifier);
-                CHECK_JNI_EXCEPTION(mainEnv)
-            }
-        } else {
-            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
-                    com_sun_glass_events_KeyEvent_RELEASE,
-                    glassKey,
-                    jChars,
-                    glassModifier);
-            CHECK_JNI_EXCEPTION(mainEnv)
-        }
-    }
+//    jint glassKey = get_glass_key(event);
+//    jint glassModifier = xlib_modifier_mask_to_glass(event->state);
+//    if (press) {
+//        glassModifier |= glass_key_to_modifier(glassKey);
+//    } else {
+//        glassModifier &= ~glass_key_to_modifier(glassKey);
+//    }
+//
+//    jcharArray jChars = NULL;
+//    jchar key = 0;
+//
+//    KeySym keysym = XLookupKeysym(event, 0);
+//
+//    g_print("KEYSYM: %ld, %d\n", keysym, event->keycode);
+//
+//    if (keysym != NoSymbol) {
+//        key = (jchar) keysym;
+//
+//        if (key >= 'a' && key <= 'z' && (event->state & ControlMask)) {
+//            key = key - 'a' + 1; // map 'a' to ctrl-a, and so on.
+//        } else {
+//            switch (keysym) {
+//                case 0xFF08 /* Backspace */: key =  '\b'; break;
+//                case 0xFF09 /* Tab       */: key =  '\t'; break;
+//                case 0xFF0A /* Linefeed  */: key =  '\n'; break;
+//                case 0xFF0B /* Vert. Tab */: key =  '\v'; break;
+//                case 0xFF0D /* Return    */: key =  '\r'; break;
+//                case 0xFF1B /* Escape    */: key =  '\033'; break;
+//                case 0xFFFF /* Delete    */: key =  '\177'; break;
+//            }
+//        }
+//
+//        if (key > 0) {
+//            jChars = mainEnv->NewCharArray(1);
+//            if (jChars) {
+//                mainEnv->SetCharArrayRegion(jChars, 0, 1, &key);
+//                CHECK_JNI_EXCEPTION(mainEnv)
+//            }
+//        } else {
+//            jChars = mainEnv->NewCharArray(0);
+//        }
+//    }
+//
+//    if (jview) {
+//        if (press) {
+//            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+//                    com_sun_glass_events_KeyEvent_PRESS,
+//                    glassKey,
+//                    jChars,
+//                    glassModifier);
+//            CHECK_JNI_EXCEPTION(mainEnv)
+//
+//            if (jview && key > 0) { // TYPED events should only be sent for printable characters.
+//                mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+//                        com_sun_glass_events_KeyEvent_TYPED,
+//                        com_sun_glass_events_KeyEvent_VK_UNDEFINED,
+//                        jChars,
+//                        glassModifier);
+//                CHECK_JNI_EXCEPTION(mainEnv)
+//            }
+//        } else {
+//            mainEnv->CallVoidMethod(jview, jViewNotifyKey,
+//                    com_sun_glass_events_KeyEvent_RELEASE,
+//                    glassKey,
+//                    jChars,
+//                    glassModifier);
+//            CHECK_JNI_EXCEPTION(mainEnv)
+//        }
+//    }
 }
 
 void WindowContext::paint(void* data, jint width, jint height) {

@@ -183,11 +183,6 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
 //            continue;
 //        }
 
-        if (XFindContext(display, xevent.xany.window, main_ctx->data_context, (XPointer *) &ctx) != 0) {
-//            g_print("CTX not found: %d, win: %ld\n", main_ctx->data_context, xevent.xany.window);
-            continue;
-        }
-
         //XInput events
         if (XGetEventData(display, &xevent.xcookie)
             && xevent.xcookie.type == GenericEvent
@@ -200,11 +195,23 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
             switch(xi_ev->evtype) {
                 case XI_KeyPress:
                 case XI_KeyRelease:
+                    XIDeviceEvent* dev = (XIDeviceEvent *) xi_ev;
+
                     g_print("XI Key event\n");
+                    if (XFindContext(display, dev->event, main_ctx->data_context, (XPointer *) &ctx) != 0) {
+                        continue;
+                    }
+
+                    ctx->process_key(dev);
+
                     break;
             }
 
             XFreeEventData(display, &xevent.xcookie);
+            continue;
+        }
+
+        if (XFindContext(display, xevent.xany.window, main_ctx->data_context, (XPointer *) &ctx) != 0) {
             continue;
         }
 
@@ -233,7 +240,7 @@ static gboolean x11_event_source_dispatch(GSource* source, GSourceFunc callback,
                     break;
                 case KeyPress:
                 case KeyRelease:
-                    ctx->process_key(&xevent.xkey);
+//                    ctx->process_key(&xevent.xkey);
                     break;
                 case ButtonPress:
                 case ButtonRelease:

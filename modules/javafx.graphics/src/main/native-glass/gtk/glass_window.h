@@ -244,7 +244,7 @@ public:
     void process_mouse_button(XButtonEvent*);
     void process_mouse_motion(XMotionEvent*);
     void process_mouse_cross(XCrossingEvent*);
-    void process_key(XKeyEvent*);
+    void process_key(XIDeviceEvent*);
     void process_map();
     void process_property(XPropertyEvent*);
     void process_client_message(XClientMessageEvent*);
