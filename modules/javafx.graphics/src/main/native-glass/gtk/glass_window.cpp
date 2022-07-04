@@ -35,6 +35,7 @@
 
 #include <com_sun_glass_ui_Window_Level.h>
 
+#include <X11/XKBlib.h>
 #include <cairo/cairo-xlib.h>
 #include <string.h>
 #include <algorithm>
@@ -556,7 +557,6 @@ void WindowContext::process_key(XIDeviceEvent* event) {
     g_print("process_key\n");
     bool press = event->evtype == XI_KeyPress;
 
-
 //    jint glassKey = get_glass_key(event);
 //    jint glassModifier = xlib_modifier_mask_to_glass(event->state);
 //    if (press) {
@@ -568,6 +568,8 @@ void WindowContext::process_key(XIDeviceEvent* event) {
 //    jcharArray jChars = NULL;
 //    jchar key = 0;
 //
+    KeySym keysym = XkbKeycodeToKeysym(display, event->detail, 0, 0);
+
 //    KeySym keysym = XLookupKeysym(event, 0);
 //
 //    g_print("KEYSYM: %ld, %d\n", keysym, event->keycode);
