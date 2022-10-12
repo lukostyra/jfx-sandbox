@@ -33,6 +33,7 @@
 #include <X11/extensions/XInput2.h>
 #include <X11/extensions/shape.h>
 #include <cairo/cairo-xlib.h>
+#include <xkbcommon/xkbcommon.h>
 #include <glib.h>
 
 #include <jni.h>

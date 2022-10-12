@@ -33,6 +33,7 @@
 #include <gdk/gdkx.h>
 #include <gtk/gtk.h>
 #include <X11/Xresource.h>
+#include <xkbcommon/xkbcommon.h>
 
 #include "wrapped.h"
 #include "xsettings-client.h"
@@ -139,6 +140,7 @@ private:
         int xkb_event_type;
         int data_context;
         XSettingsClient *settings_client;
+        xkb_state * kb_state;
     } MainContext;
 
     extern MainContext * main_ctx;

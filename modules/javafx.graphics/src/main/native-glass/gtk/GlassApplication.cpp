@@ -327,6 +327,8 @@ JNIEXPORT jint JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1initGTK
                                   XkbModifierStateMask|XkbGroupStateMask);
 
             XkbSetDetectableAutoRepeat(display, True, &detectable_autorepeat_supported);
+
+            main_ctx->kb_state = xkb_state_new()
 //        TODO: handle those events
         }
     }
@@ -431,6 +433,7 @@ JNIEXPORT void JNICALL Java_com_sun_glass_ui_gtk_GtkApplication__1terminateLoop
         g_print("g_source_destroy\n");
         g_source_remove_poll(&main_ctx->source, &main_ctx->dpy_pollfd);
         g_source_destroy(&main_ctx->source);
+        xkb_state_unref(main_ctx->kb_state);
         g_print("xsettings_client_destroy\n");
         //xsettings_client_destroy(main_ctx->settings_client);
         g_print("XCloseDisplay\n");

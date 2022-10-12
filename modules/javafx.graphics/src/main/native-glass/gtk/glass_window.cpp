@@ -565,14 +565,17 @@ void WindowContext::process_key(XIDeviceEvent* event) {
 //        glassModifier &= ~glass_key_to_modifier(glassKey);
 //    }
 //
-//    jcharArray jChars = NULL;
-//    jchar key = 0;
-//
+    jcharArray jChars = NULL;
+    jchar key = 0;
+
     KeySym keysym = XkbKeycodeToKeysym(display, event->detail, 0, 0);
 
-//    KeySym keysym = XLookupKeysym(event, 0);
-//
-//    g_print("KEYSYM: %ld, %d\n", keysym, event->keycode);
+    if (keysym != NoSymbol) {
+        uint32_t res;
+        res = xkb_keysym_to_utf32(keysym);
+        g_print("KEYSYM: %ld, %d\n", keysym, event->detail);
+    }
+
 //
 //    if (keysym != NoSymbol) {
 //        key = (jchar) keysym;
